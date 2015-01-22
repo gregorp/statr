@@ -1,36 +1,38 @@
 Items from my `ggplot2` cheatsheet (relatively common tasks I can never remember the syntax for):
 
-Rotating axis labels
+### Rotating axis labels
 
 ```r
 + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0))
 ```
 
-Getting rid of background color in facet labels
+### Getting rid of background color in facet labels
 
 ```r
-+ theme(strip.background = element_rect(fill = "grey90"))
++ theme(strip.background = element_rect(fill = NA))
 ```
 
-Scale formatting
+### Scale formatting
 
 ```r
 + scale_x_continuous(labels = percent_format()) # or date_format() or comma_format()
 ```
 
-Including 0
+### Including 0 on an axis
 
 ```r
 + expand_limits(y = 0)
 ```
 
-Font changes
+### Font changes
+
+For most fonts, you'll need the `extrafont` package loaded. The font you specify needs to match the vector returned by `fonts()`.
+
 ```r
 + theme(text = element_text(family = "Frutiger LT Std 45 Light"))
-# needs to have run extrafont::loadfonts()
 ```
 
-Arranging ggplots
+### Arranging multiple plots
 ```r
 grid.arrange(p1, p2, ncol = 1, heights = c(3, 1)) # p1 on top of p2, p1 3 times taller
 
@@ -54,9 +56,21 @@ layOut(list(p1, 1:3, 1:3), # plot p1 fills rows 1:3 and columns 1:3
        list(p4, 4, 1:3))   # plot p4 fills row 4 and columns 1:3
 ```
 
-## Legends stuff
+### Legend stuff
 
 ```r
 + theme(legend.position = c(0.5, 0.1)) # relative placement, also "none", "top", "left", etc.
-+ guides(colour = guide_legend(override.aes = list(alpha = 1))) # overriding alpha (works for colour in a fill legend
++ guides(colour = guide_legend(override.aes = list(alpha = 1))) # overriding alpha (works for colour in a fill legend)
++ guides(colour = guide_legend(reverse = T)) # reverse the order of the legend
+# See ?guide_legend for many more options
+```
+
+### Adding labels to contour plots
+
+```
+volcano3d <- melt(volcano)
+v <- ggplot(volcano3d, aes(x, y, z = z)) + 
+    stat_contour(aes(colour = ..level..))
+library(directlabels)
+direct.label(v2)
 ```
