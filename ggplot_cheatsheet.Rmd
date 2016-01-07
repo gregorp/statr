@@ -1,4 +1,6 @@
-Items from my `ggplot2` cheatsheet (relatively common tasks I can never remember the syntax for):
+## Common `ggplot2` solutions
+
+Items from my `ggplot2` cheatsheet (relatively common tasks I can never remember the syntax for). **Note:** I have not updated this since the `ggplot2` version 2.0 release! 
 
 ### Rotating axis labels
 
