@@ -1,0 +1,212 @@
+---
+title: "StatR 502: Lab 0"
+subtitle: "knitr and ggplot2"
+author: "Gregor Thomas"
+date: "January 5, 2016"
+output: ioslides_presentation
+---
+
+## Welcome to StatR 502!
+
+Tonight's Menu:
+
+- Course logistics *briefly* (more on Thursday)
+- Easy, reproducible, organized documents with `knitr`
+- Intro to `ggplot2`
+
+## Logistics
+
+- Me
+- Website - use the forums!
+- Content
+- Book
+
+# knitr
+
+```{r, include=FALSE}
+packages = c("ggplot2", "knitr")
+sapply(packages, FUN = library, character.only = TRUE)
+opts_chunk$set(fig.height = 3)
+```
+
+
+## What is `knitr`?
+
+- Tool for producing reports / presentations - or just narrating an analysis
+- Keeps R code and write-up in one document, *together*
+- knit documents should be **self-contained**
+
+
+## Markdown is easy!
+
+Markdown was designed with the goals of being easy to read and easy to write,
+with special emphasis on readability of the code.
+
+You're probably already familiar with some markdown conventions even if you don't know it!
+
+The RStudio website has very nice introductions to [Markdown](http://rmarkdown.rstudio.com/authoring_basics.html) 
+and [rmarkdown](http://rmarkdown.rstudio.com/)
+
+## Embedding code
+
+- Code chunks
+- Inline code
+
+## Possibe conversions
+
+`knitr` is extremely flexible. 
+
+> * **input** Markdown is the simplest input language, but you can also use $\LaTeX$ (typically with the file extension `.Rnw`), HTML, AsciiDoc, etc. as the input language.
+
+> * **code** With configured installations, you can evaluate code for languages other than R. [There are examples](http://yihui.name/knitr/demo/engines/) for Python, Ruby, Haskell,  and many others (though support for R is strongest).
+
+> * **output** `knitr` itself implements the narrowly-scoped task of evaluating R code and inserting appropriately formatted output into your document. Conversion is then handled by Pandoc (e.g. `knitr` turns `.Rmd` to `.md`, or `.Rnw` to `.tex`; Pandoc takes the `.md` or `.tex` and turns it into HTML, PDF, Word, etc. Pandoc relies on $\LaTeX$ for conversions to PDF.)
+
+## Chunk options
+
+- Display & code: `echo`, `eval`, `include`, `results`
+- Figures: `fig.keep`, `fig.width`, `fig.height`, `out.width`, `out.height`, `dpi`
+- Other output: `message`, `warning`, `error`
+
+Not all chunk options work for all output formats. The best documentation is on [Yihui's website](http://yihui.name/knitr/options/#chunk_options).
+
+## Setting options
+
+There are default options for code chunks (`echo = TRUE`, `eval = TRUE`, ...). If you want to set different default options for your document, you can use `opt_chunk$set()`. To programmatically access a current option, use `opt_chunk$get()`. For example
+
+```{r, eval = FALSE}
+opts_chunk$set(eval = FALSE)
+opts_chunk$get("fig.width")
+```
+
+The above chunk would make subsequent chunks unevaluated by default.
+Often the first chunk in a document will set some options (e.g., figure widths and heights) and load necessary packages. It can be hidden with its own option set to `include = FALSE`.
+
+## Common "gotchas" {.smaller}
+
+- If a figure looks poor, experiment with both `fig.height/width` and `dpi` (HTML/Word) or `out.height/width` (PDF).
+
+- The code in the document should be able to stand alone - load all packages you need.
+    
+    - The RStudio shortcut compiles your document in a separate R session, so it **must** be self-contained.
+    
+    - If you use `knitr` functions (like `opts_chunk$set()`) *inside* code chunks, you need to load `knitr`.
+
+- Make sure you save your changes before knitting! (This is taken care of for you if you use the shortcut in RStudio.)
+
+- Don't use the `.Rpres` "R presentation" format; it is mostly deprecated - for presentations use HTML formats like `io_slides` or `Slidy` (accessible via Pandoc), `slidify` (which has its own R package), or PDF via Beamer.
+
+# ggplot2
+
+## Advantages and Disadvantages {.smaller}
+
+`ggplot2` is the cure to the headaches you get when you try to make beautiful, effective plots using R's other graphics packages (base graphics and lattice).
+
+The "gg" stands for "Grammar of Graphics", which is a creation of Leland Wilkinson (he has a book on the topic of the same name). The `ggplot2` package is an R implementation by Hadley Wickham.
+
+- Advantages: consistent and accessible syntax, and lattice-like ability to create "small multiples" of graphs (called *facets*), customizable theming system, wide array of easily modified options.
+
+- Disadvantages: **requires** data frames, in relatively specific formats. Some adjustments are near impossible. Modifications outside of the (wide array of) standard options can be very difficult.
+
+With great ease of use comes loss in flexibility.
+
+## Philosophy
+
+R "2.0", with Hadley Wickham as the figurehead:
+
+- `ggplot2` for graphs
+
+- `dplyr` and `tidyr` for data manipulation
+
+- `lubridate` for handling dates and times
+
+- `stringr` for string manipulation
+
+-  `knitr` for publishing
+
+- And more: `httr`, `devtools`, `testthat`, `roxygen2`, `readr`, `ggvis`, the list goes on...
+
+Consistent syntax and improved readability
+for faster work and fewer bugs.
+
+## Grammar of Graphics
+
+Dimensions of data correspond to dimensions in the graph.
+
+The most commonly used graphical dimensions are x-position, y-position, and color.
+What other graphical dimensions can you think of?
+
+In `ggplot`, the correspondences between data and graphical dimensions are called *aesthetic mappings*. They are set inside of the `aes()` argument.
+
+## Building a ggplot {.smaller}
+
+A ggplot always starts by setting up your data and the aesthetic mappings:
+
+```{r, eval = F}
+ggplot(mtcars, aes(x = wt, y = mpg))
+```
+
+Inside `aes()` you put all the relations between visualization and your data. Use "unquoted" column names.
+
+(In general, whenever a function has a `data` argument, you shouldn't need to re-specify the data frame name to refer to columns.)
+
+## Building a ggplot {.smaller}
+    
+And then literally adding geometries ("geoms") - data visualization elements.
+
+```{r, eval = T}
+ggplot(mtcars, aes(x = wt, y = mpg)) +
+  geom_point()
+```
+
+## Building a ggplot {.smaller}
+
+You can specify more `aes()` details inside a `geom()` (or up front in the original `ggplot()`),
+but if you are assigning **constants** (unconnected to data),
+keep it outside of `aes()`.
+
+```{r, eval = T, dpi = 60}
+ggplot(mtcars, aes(x = wt, y = mpg)) +
+  geom_point(aes(shape = factor(cyl)), color = "darkolivegreen", size = 4)
+```
+
+Data inside `aes()`, constants outside `aes()`. Notice that we *don't* need to 
+specify the data that the columns come from, no need for `shape = factor(mtcars$cyl)`.
+Subsequent functions will "know" to look inside the already-specified data frame for anything inside `aes()`.
+
+## Building a ggplot {.smaller}
+
+There's lots of geoms, some of the standards are `geom_point`, `geom_line`, `geom_bar`, `geom_boxplot`. You can see all of them with some pretty good examples at <http://docs.ggplot2.org/current/>. When looking at documentation for a geom, the most important info is the aesthetics.
+
+```{r, eval = T}
+ggplot(mtcars, aes(x = factor(cyl), y = mpg)) +
+  geom_boxplot()
+```
+
+## A `ggplot` is an object
+
+`ggplots` are objects, and can be assigned to variables, and
+we can use more aesthetics than just `x` and `y`. But just like other variables in R, they don't print on assignment.
+
+Coming from `base` graphics, this might seem strange and uncomfortable. <div color="firebrick4"> they work just like the typical R object you are accustomed to.</div>
+
+---
+
+```{r, eval = T}
+mt <- ggplot(mtcars, aes(x = disp, y = mpg, size = wt,
+                         color = factor(cyl))) +
+  geom_point()
+mt
+```
+
+## A `ggplot` is an object
+
+It can be modified.
+
+```{r, eval = T}
+mt + theme_bw()
+```
+
+This is very different from base, and can save a lot of copy/pasting to make variations of the same graph.
+
+# That's all for tonight!
