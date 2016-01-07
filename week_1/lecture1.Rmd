@@ -1,0 +1,270 @@
+---
+title: 'StatR 502 Lecture 1: Likelihood'
+author: "Gregor Thomas"
+date: "Thursday, January 7, 2016"
+output:
+  ioslides_presentation:
+    fig_height: 4
+    fig_width: 6
+  beamer_presentation:
+    fig_height: 3.5
+    fig_width: 5
+    theme: boxes
+  slidy_presentation:
+    fig_height: 3.5
+    fig_width: 5
+    highlights: espresso
+    incremental: yes
+---
+
+## Tonight's Menu:
+
+* Logistics
+* About the course
+    * Statistical map for the quarter
+    * R Programming map for the quarter
+* Linear Regression Motivation & Discussion
+* Likelihood
+    * Binomial example
+    * Gaussian example
+    * Regression with the Matrix
+
+
+```{r, include = FALSE}
+library(ggplot2, quietly = T)
+```
+
+## Logistics {.build .smaller}
+
+- Lecture questions from online students *during lectures*: please use email or Google Chat: gregorp@uw.edu
+
+- File downloads (lecture/lab/homework files) will be on Github <https://github.com/gregorp/statr>
+
+- The Canvas course site will be used for forums, assignment dropboxes, announcements, other links...
+
+- We're happy to have Scott Rinnan continue on as TA. He'll keep the same office hours as last quarter, 7-8 pm on Tuesdays (Pacific, of course).
+
+- ...convenient for homework help. Homeworks will be due on Thursdays at 6:30, right
+as lecture begins. Extensions are usually possible, but please ask via email, copying both me and Scott. **First homework is due next Thursday!**
+
+- If you are having trouble *ask for help*. Both Scott and I are available to you. *However*...
+
+- The forums are **the best place** to get help! You are not all college freshman, sitting next to each other in 5 classes and living in the dorms together, but your classmates are just a forum post away.
+
+## This Quarter in Statistics
+
+You will become proficient in linear modeling: *building, evaluating, testing, and interpreting* linear models and their extensions.
+
+This includes:
+
+- picking appropriate model frameworks
+- transforming variables as needed
+- variable selection
+- many metrics for evaluating goodness-of-fit
+- inference on fitted coefficients
+- understanding and communicating what a model can tell you
+
+## This Quarter in Statistics
+
+By "linear models and their extensions", we will explicitly cover
+
+- multiple linear regression
+- logistic regression
+- generalized linear models
+- robust regression (lightly)
+- additive models
+- mixed / random effects / hierarchical / multilevel modeling
+
+## This Quarter in R Programming
+
+At the end of the quarter, you will be able to
+
+* Make beautiful ggplots
+* Import data from wide variety of formats
+* Manipulate data quickly and competently
+* Manage an efficient workflow
+* Build your own R package!
+
+# Questions?
+
+# Linear Regression
+
+## Why?
+
+```{r}
+fortunes::fortune(49)
+```
+
+Regression, in particular linear regression, is the first modeling tool statisticians reach for, and for most of the 20th Century it was **the** tool.
+
+Many (most?) more advanced methods are extensions or adaptations of linear regression. A solid understanding of linear models will make more specialized methods much easier to grasp.
+
+## Gelman & Hill Chapter 3 {.build}
+
+*Child IQ example*
+
+When an analyst gets data, usually it comes with some general questions. The first job is to refine the questions to something that can be addressed by the data. 
+
+What effects do you expect? How strong do you think they might be?
+
+- What about modeling voting preference based on demographics?
+- Can you have large *effect sizes* but still have lots of error?
+- What about small effect sizes but near-perfect predictions (not much error)?
+
+# Likelihood
+
+---
+
+Gelman & Hill are light on the math--overall I think this is a good thing, but likelihood needs more attention.
+
+The quick explanation of likelihood is simple. The classical probability approach to a random process is to write a function that is the probability of the data $X$ in terms of parameters $\theta$.
+
+$$ P(X | \theta)  $$
+
+This is backwards for a data analysis workflow!
+
+---
+
+$$ P(X | \theta)  $$
+
+This is backwards for a data analysis workflow!
+
+**Analyzing data**, we usually know the data ($X$ is given), and want to think about the probability of the parameters. *The same equation works*, but when we think about it as a function of the parameters *given the data*, it's a likelihood!
+
+$$ L(\theta | X) $$
+
+The value of $\theta$ that maximizes this function is the most likely set of parameters given the data, called the Maximum Likelihood Estimate (MLE) and written $\hat{\theta}$.
+
+## Probability vs. Likelihood Analogy {.smaller}
+
+Imagine you're a rocket scientist at NASA, working on planning a trip to Mars... 
+
+You have giant complicated equation with
+
+- some fixed terms
+- some variable terms
+- many possible solutions
+
+
+Now imagine that something goes wrong on the mission and you need to adjust the plan mid-mission...
+
+Physics hasn't changed. Your equation(s) hasn't changed.
+
+- different fixed terms
+- different variable terms
+
+Same symbolic equation, but a very different problem.
+
+## Probability vs. Likelihood
+
+- Probability - parameters are fixed, data is variable (theoretical)
+- Likelihood - data is fixed, parameters are variable (applied)
+
+## Simple example {.smaller}
+
+**Binomial likelihood:** Say we see 10 coin flips, and 6 are heads (data). What is the maximum likelihood estimate of $p$, the probability of heads on any one flip (parameter)?
+
+Remember the *pmf* for the binomial distribution
+
+$$
+f(x) = {{n}\choose{x}} p^x (1-p)^{n-x}
+$$
+
+From our data, we know $n = 10$ and $x = 6$, so our likelihood function is
+
+$$
+L(p) = {{10}\choose{6}} p^6 (1-p)^{4}
+$$
+
+Let's maximize it. What's the MLE, $\hat{p}$? (Hint, it shouldn't be surprising.)
+
+## Likelihood and Regression
+
+As you saw last quarter and in Gelman & Hill, the linear regression equation is 
+
+$$ y = X \beta + \epsilon $$
+
+where $\epsilon \sim N(0, \sigma^2I)$. To write the likelihood, use the multivariate normal pdf (simplified a little since the covariance matrix is diagonal):
+
+$$
+\phi(x) = \frac{1}{\sqrt{\sigma^2 2 \pi}} \exp(- \frac{(x - \mu)'(x - \mu)}{2 \sigma^2})
+$$
+
+## Interlude: Matrix/Vector Multiplication {.build}
+
+- What are the *dimension* requirements for matrix multiplication?
+- What are $X$ and $\beta$ in $y = X \beta + \epsilon$ ?
+- What does $X \beta$ mean?
+- Why do we (usually) add a column of 1s to $X$ ?
+- How do you matrix multiply in R?
+- For a vector $e$, what is $e^Te$ ?
+
+## Interlude: Matrix/Vector Multiplication {.build .smaller}
+
+- What are the *dimension* requirements for matrix multiplication? 
+    - columns of first = rows of second
+- What are $X$ and $\beta$ in $y = X \beta + \epsilon$ ?
+    - each row of $X$ is an observation, each column of $X$ is a variable
+    - each element of $\beta$ is a parameter corresponding to a column of $X$
+- What does $X \beta$ really do?
+    - shorthand for $\beta_1 x_1 + \beta_2 x_2 + \ldots$
+- Why do we (usually) add a column of 1s to $X$ ?
+    - Intercept term!
+- How do you matrix multiply in R?
+    - `%*%`
+- For a vector $e$, what is $e^Te$ ?
+    - Sum of squares of $e$
+
+## Working with likelihoods
+
+Working with likelihoods, there are simplifications to make calculations easier that are almost always used:
+
+1. We don't care about the exact value, only the maximum or minimum, so proportional constants are ignored.
+
+2. $L(\theta | y)$ will be maximized at the same place as its logarithm, so we usually work with the log likelihood $l(\theta | y) = \log(L(\theta | y))$. (Think: why is this statement true?)
+
+3. Inverting large matrices is **slow**. Any serious regression fitting algorithm will factorize the matrix (often using the *Cholesky decomposition*) which is much more efficient and numerically stable.
+
+## Least squares is the MLE
+
+It all comes down to minimizing $\epsilon^T\epsilon$, which is the sum of the squared error.
+
+Nice properties of the MLE:
+
+- **consistent:** as $n \rightarrow \infty$, the bias ($E(Y) - \hat{y}$) approaches 0.
+- **functionally invariant:** if $f()$ is a one-to-one function, then the MLE of $f(y)$ is $f(\hat{y})$.
+
+For ordinary linear regression, the MLE is the *Best Linear Unbiased Estimator* (BLUE), where "best" means that, *of all unbiased linear estimators, the MLE has the smallest variance*.
+
+## Least squares solution {.smaller}
+
+The MLE for ordinary least squares:
+
+$$ y = X \beta + \epsilon, \quad \epsilon \sim N(0, \sigma^2)$$
+
+is given by the *Beta Hat Waltz*
+
+$$ \hat{\beta} = (X'X)^{-1} X' Y $$
+
+And the predicted estimate is
+
+$$ \hat{y} = X \hat{\beta} = X (X'X)^{-1} X' Y $$
+
+Or, more simply, $\hat{y} = H y$, where the *hat matrix* is $H \equiv X (X'X)^{-1} X$
+
+## A quick example with numbers
+
+Enough theory for tonight! Let's do a *very* simple example in R.
+
+```{r}
+set.seed(47)
+x = c(1, 2, 3)
+y = c(2, 3, 4) + rnorm(3)
+```
+
+Find the best value for $\beta$ using matrix multiplication.
+
+What do you think of your result?
+
+# Questions?
+
