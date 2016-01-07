@@ -1,4 +1,4 @@
-statr
+StatR 502
 =====
 
-Partially formed thoughts for Statr 301
+File hosting site for StatR 502.
