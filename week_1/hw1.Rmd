@@ -1,0 +1,76 @@
+---
+title: "StatR 502 Homework 1"
+author: "Gregor Thomas"
+date: "Due Thursday, Jan. 14, 2016 at 6:30 pm"
+output:
+  html_document:
+    theme: "cosmo"
+    toc: yes
+  pdf_document:
+    toc: no
+---
+
+Submission guidelines: please submit either a PDF or Word document created in `knitr`. As always, ask in the discussion forum if you have
+trouble!
+
+## 0: Face recognition
+
+On the Canvas site, please upload a profile picture. (Go to the *settings* in the top right and click on the spot for a picture.) Especially for online students, I really want to be able to associate an image with you in the discussions. It doesn't have to be a photograph of you, just something more interesting than ![default profile image](default_profile.png).
+
+You do not need to include this document in your write-up.
+
+## 1: Overplotting
+
+Load the data for this problem (the file `hw1data.rdata`)
+using the `load()` command. This will create a
+`data.frame` in your workspace called `pr1` (no assignment with `<-` or `=` needed!).
+The data frame has two columns, `x` and `y`, and there's a surprise
+hidden in it. Your job is to find the surprise through some exploratory
+plots. Once you've found it, make a plot that
+shows it nicely, and present that as your solution.
+
+This problem highlights one of the main drawbacks `ggplot2`:
+it can be RAM-intensive and slow with large data sets.
+Usually, however, you don't need half a million
+points in a single plot. Transparency can help a lot, but
+subsets and statistical summaries can do a nice job without
+taxing your computer or your patience.
+
+## 2: Exploring new options
+
+Make 3 ggplots exploring different options.
+At least one of the plots should use facets, and none of 
+them should be plain scatterplots (if you use `geom_point`, complement it with another `geom` or `stat`).
+You can choose any dataset(s) you've worked with in StatR 501, from other problems on this homework, or from your work/interests.
+
+Pick one of your plots to polish, and spend an extra 10-15 minutes
+on it adding nice labels, adjusting a theme element or two, making sure any factors
+are ordered in a meaningful way, etc.
+
+Some suggestions for geoms (but feel free to explore further!): `geom_rug`,
+`geom_boxplot`, `geom_text`, `geom_violin`, `stat_smooth`.
+
+## Problems from Gelman & Hill
+
+Section 3.9 (pp. 49-51), **do problems 2, 3, and 5**. In your write-up, please label them as G&H 2, G&H 3, and G&H 5. The `se.coef()` function in G&H 3 is part of the `arm` package (written to accompany the book).
+
+**For G&H 2:** The logs add a little twist to this problem. We'll be talking about transformations - especially log transformations - next week. A couple clarifications/hints:
+
+- "1% change in $x$ results in 0.8% change in $y$" means that the slope of $\log y$ versus $\log x$ is 0.8.
+
+- "Fall within a factor of 1.1" on the untransformed scale means "plus or minus 0.1" on the log scale. (Well, it really means $\pm \log(1.1)$ but $\log(1.1) = `r log(1.1)`$ so we'll call 0.1 a good-enough approximation.)
+
+**For G&H 5:** the data can be found in the `AER` package, it's called `TeachingRatings`. The column names are different from those called out in the book, see `?TeachingRatings` for details. In part (b), let's consider "some other models" to mean "two or three" other models that you explain.
+
+## Extra Problems
+
+Extra problems are completely optional and will not be graded, but feel free to ask for help or even post solutions in the forums! If you have extra time and the inclination, give them a go!
+
+### Extra Problem
+
+Proof that $\hat{\beta}$ is the least-squares solution: Linear regression starts with the equation $Y = X\beta + \epsilon$. To minimize the sum of the squared error, $\epsilon^T\epsilon$, solve for it, then differentiate with respect to $\beta$ and set the result equal to 0 (just as you would find the minimum of any differentiable function). Show that the value, $\hat{\beta}$, that is the minimum is indeed $(X^TX)^{-1}X^TY$. The following vector calculus results should be helpful:
+
+- $\frac{d}{dx} x'x = 2x'$
+- $\frac{d}{dx} Ax = A$
+- $\frac{d}{dx} x'Ax = x'(A' + A)$
+
