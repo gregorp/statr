@@ -13,6 +13,8 @@ output:
 Submission guidelines: please submit either a PDF or Word document created in `knitr`. As always, ask in the discussion forum if you have
 trouble!
 
+*If I were you*, I would open the rmarkdown source of the homework, change the author name and output format at the top, delete some unnecessary text (problem 0, this note, etc.), and fill in my solutions below the problem statements. Not required, but not a bad way to go about it.
+
 ## 0: Face recognition
 
 On the Canvas site, please upload a profile picture. (Go to the *settings* in the top right and click on the spot for a picture.) Especially for online students, I really want to be able to associate an image with you in the discussions. It doesn't have to be a photograph of you, just something more interesting than ![default profile image](default_profile.png).
