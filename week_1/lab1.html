@@ -226,8 +226,6 @@ mtplot = ggplot(mt, aes(x = wt, y = mpg, color = cyl)) +
 
 <pre class = 'prettyprint lang-r'>theme_set(theme_bw())</pre>
 
-<p>Formulas are used for faceting.</p>
-
 </article></slide><slide class='segue dark nobackground'><hgroup class = 'auto-fadein'><h2>Let&#39;s get plotting</h2></hgroup><article  id="lets-get-plotting">
 
 </article></slide><slide class=''><hgroup><h2>Small multiples</h2></hgroup><article  id="small-multiples">
@@ -258,7 +256,8 @@ mtplot = ggplot(mt, aes(x = wt, y = mpg, color = cyl)) +
 
 <ul>
 <li><p>Cynthia Brewer&#39;s color palettes at <a href='http://colorbrewer2.org/' title=''>http://colorbrewer2.org/</a>. These are available in the <code>RColorBrewer</code> package, is imported by ggplot.</p></li>
-<li><p>Breaks and values</p></li>
+<li>Breaks and values</li>
+<li><p>Transformations</p></li>
 </ul>
 
 </article></slide><slide class=''><hgroup><h2>Theming</h2></hgroup><article  id="theming">
@@ -274,6 +273,13 @@ mtplot = ggplot(mt, aes(x = wt, y = mpg, color = cyl)) +
 
 <ul>
 <li><code>gridExtra::grid.arrange()</code> is like <code>par(mfrow)</code>/<code>mfcol</code></li>
+</ul>
+
+</article></slide><slide class=''><hgroup><h2>Scales vs coordinate systems</h2></hgroup><article  id="scales-vs-coordinate-systems">
+
+<ul>
+<li>zooming with <code>coord_cartesian(xlim, ylim)</code> vs clipping with <code>scale</code> functions</li>
+<li>other coordinate systems</li>
 </ul>
 
 </article></slide><slide class=''><hgroup><h2>Common &quot;gotchas&quot; in ggplot2</h2></hgroup><article  id="common-gotchas-in-ggplot2" class="smaller build">
