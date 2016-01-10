@@ -125,8 +125,6 @@ for the rest of your R session with `theme_set()`
 ```{r}
 theme_set(theme_bw())
 ```
-
-Formulas are used for faceting.
  
 # Let's get plotting
 
@@ -155,6 +153,7 @@ And how to read geom help files
 - Cynthia Brewer's color palettes at <http://colorbrewer2.org/>. These are available in the `RColorBrewer` package, is imported by ggplot.
 
 - Breaks and values
+- Transformations
 
 ## Theming
 
@@ -166,6 +165,11 @@ There's a whole vignette on creating and customizing themes: <http://docs.ggplot
 ## Putting several plots together
 
 - `gridExtra::grid.arrange()` is like `par(mfrow)`/`mfcol`
+
+## Scales vs coordinate systems
+
+- zooming with `coord_cartesian(xlim, ylim)` vs clipping with `scale` functions
+- other coordinate systems
 
 ## Common "gotchas" in ggplot2 {.smaller .build}
 
