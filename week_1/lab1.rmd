@@ -1,0 +1,187 @@
+---
+title: "StatR 502 Lab 1"
+author: "Gregor Thomas"
+date: "Sunday, January 11, 2016"
+output: ioslides_presentation
+---
+
+---
+
+```{r}
+knitr::opts_chunk$set(cache = TRUE, fig.width = 6, fig.height = 2.75)
+```
+
+
+Remember key points from last week:
+
+- ggplots are *objects*
+- `aes()` is where we set *aesthetic mappings* from data to aesthetic plotting concepts.
+- Use *unquoted* column names inside `aes()`, **never** `data$column`.
+
+And a couple key points for this week:
+
+- Work on getting your *data* right, and plotting should be easy.
+
+## Jumping in where we left off
+
+```{r}
+library(ggplot2)
+# new dataset name (for convenience)
+mt = mtcars
+mtplot = ggplot(mt, aes(x = wt, y = mpg)) +
+    geom_point()
+print(mtplot)
+```
+
+## Adding color {.smaller}
+
+```{r}
+ggplot(mt, aes(x = wt, y = mpg, color = cyl)) +
+    geom_point()
+```
+
+## Discrete vs. continuous
+
+```{r}
+# but `cyl` is discrete!
+table(mt$cyl)
+# why do we have this continuous color scale?
+```
+
+## Discrete vs. continuous
+
+```{r}
+# but `cyl` is discrete!
+table(mt$cyl)
+# why do we have this continuous color scale?
+class(mt$cyl)
+```
+
+## {.smaller}
+
+Column `class` is very important to `ggplot`.
+
+Continuous (numeric) vs. discrete (factor, character) is what you'll use most of the time. You can either modify your data or do it on-the-fly. I generally prefer to modify the data (`mt$cyl = as.factor(mt$cyl)`), but here's doing it on-the-fly:
+
+```{r}
+mtplot + geom_point(aes(color = factor(cyl)))
+```
+
+Notice that (a) I can modify the existing plot, even overwriting existing aesthetic mappings, and (b) I can also set `aes()` inside a `geom` layer.
+
+--- 
+
+But now let's modify that data because I don't want to type `factor(cyl)` for the rest of the lab:
+
+```{r}
+mt$cyl = as.factor(mt$cyl)
+# and redefine the plot with the new data
+mtplot = ggplot(mt, aes(x = wt, y = mpg, color = cyl)) +
+    geom_point()
+```
+
+---
+
+Do be careful converting factors to numerics!!!
+
+```{r}
+head( mt$cyl                           , 10)
+head( as.numeric(mt$cyl)               , 10)
+head( as.numeric(as.character(mt$cyl)) , 10)
+```
+
+##  Labeling is easy {.smaller}
+
+Aesthetics are labeled by name in `labs()`.
+
+```{r}
+mtplot + 
+  geom_point(aes(color = cyl, size = disp)) +
+  theme_classic() +
+  labs(x = "Weight (1,000 lbs)",
+       y = "Efficiency (mpg)",
+       color = "Number of Cylinders",
+       size = "Displacement (cu. in.)",
+       title = "What a lovely\nexample plot")
+```
+
+## Consistent syntax
+
+- everything is lower case (**general Hadleyverse**)
+- function names use underscore for word separation (`geom_point`) (**general Hadleyverse**)
+- if there's a data argument, it will be first (**general Hadleyverse**)
+- for data that is plotted directly, the plotting function is a `geom`
+- other statistical summaries are `stat`s
+- labels are in the `labs` function
+- `scale` functions determine, e.g., axis limits, transformations.
+
+## Default themes
+
+The default is `theme_grey`. Many others are available (see `?ggtheme` for a few... or the whole [`ggthemes` package](https://cran.r-project.org/web/packages/ggthemes/vignettes/ggthemes.html)).
+
+You can change your default theme
+for the rest of your R session with `theme_set()`
+
+```{r}
+theme_set(theme_bw())
+```
+
+Formulas are used for faceting.
+ 
+# Let's get plotting
+
+## Small multiples
+
+Small multiples, or *facets*, are trivial with ggplot.
+
+## More facets
+
+- `facet_wrap` vs. `facet_grid`
+
+## Common and less common aesthetics
+
+- `x`, `y`
+- `color` and `fill`
+- `size`, `linetype`, `shape`
+- `alpha`, is for transparency
+- geom-specific aesthetics
+
+## Adding new geoms
+
+And how to read geom help files
+
+## Scales
+
+- Cynthia Brewer's color palettes at <http://colorbrewer2.org/>. These are available in the `RColorBrewer` package, is imported by ggplot.
+
+- Breaks and values
+
+## Theming
+
+- Some `ggthemes` themes
+- Why are themes functions?
+
+There's a whole vignette on creating and customizing themes: <http://docs.ggplot2.org/dev/vignettes/themes.html>. We'll cover theme modifications in the future...
+
+## Putting several plots together
+
+- `gridExtra::grid.arrange()` is like `par(mfrow)`/`mfcol`
+
+## Common "gotchas" in ggplot2 {.smaller .build}
+
+- ggplot is built on the `grid` graphics system. This is completely separate system from base graphics, and there is **no overlap** in plotting functions.
+
+- ggplot is made to work with data in *long* form (not *wide* form).
+
+- line breaks between geoms/layers/scales - don't forget to end a line with `+` if your plot continues
+
+- don't use `data$column` inside `aes()`
+
+- anything you set to a **constant** - doesn't vary with your data - is set **outside** `aes()` 
+
+- data types ("discrete value supplied to continuous scale")
+
+- fill vs. color
+
+
+
