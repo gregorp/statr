@@ -38,6 +38,10 @@ mtplot + facet_wrap(~ gear, scales = "free")
 
 Bigger data for better faceting:
 
+
+```
+
+
 ```{r}
 diam = diamonds[1:5000, ]
 
@@ -54,6 +58,12 @@ dplot + facet_grid(color ~ clarity)
 ```
 
 Dealing with overplotting
+
+
+
+dplot + facet_grid(color ~ clarity)
+```
+
 
 ```{r}
 ggplot(diamonds, aes(x = carat, y = price)) + geom_point(alpha = 0.05, shape = 20)
@@ -81,6 +91,9 @@ dplot + scale_y_continuous(trans = "log", breaks = c(500, 1000, 3000), labels = 
 Sticking ggplots together
 
 ```{r}
+mtplot
+dplot
+
 library(gridExtra)
 grid.arrange(mtplot, dplot, nrow = 1, widths = c(.7, .3))
 ```
@@ -92,6 +105,7 @@ ggplot(diam, aes(x = carat)) +
     geom_bar() +
     coord_polar()
 ```
+
 
 Zooming vs. clipping
 
@@ -132,5 +146,11 @@ ggplot(DoverData, aes(MLL)) +
     geom_histogram(binwidth=5) + 
     facet_wrap(~Gear, scales="free")
 ```
+
+
+
+
+
+
 
 
