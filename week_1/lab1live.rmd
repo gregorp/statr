@@ -1,0 +1,92 @@
+---
+title: "Lab 1 Live"
+author: "Gregor Thomas"
+date: "January 11, 2016"
+output: html_document
+---
+
+```{r}
+library(ggplot2)
+mt = mtcars
+mt$cyl = as.factor(mt$cyl)
+# and redefine the plot with the new data
+mtplot = ggplot(mt, aes(x = wt, y = mpg, color = cyl)) +
+    geom_point()
+```
+
+
+```{r}
+library(ggthemes)
+mtplot + theme_economist() +
+    labs(title = "Economist theme")
+
+mtplot + theme_fivethirtyeight()
+mtplot + theme_excel()
+```
+
+```{r}
+mtplot + facet_wrap(~ gear)
+
+mtplot + facet_wrap(~ gear, ncol = 2)
+mtplot + facet_wrap(~ gear, scales = "free")
+
+```
+
+```{r}
+diam = diamonds[1:5000, ]
+
+dplot =ggplot(diam, aes(x = carat, y = price)) +
+    geom_point()
+
+dplot + facet_wrap(~ color)
+
+dplot + facet_grid(color ~ clarity)
+```
+
+```{r}
+ggplot(diamonds, aes(x = carat, y = price)) + geom_point(alpha = 0.05, shape = 20)
+
+ggplot(diamonds, aes(x = carat, y = price)) +
+    stat_bin_2d(bins = 60)
+
+ggplot(diamonds, aes(x = carat, y = price)) +
+    stat_bin_hex(bins = 60)
+
+```
+
+```{r}
+mtplot + scale_color_brewer(type = "qual") + theme_bw()
+
+mtplot + scale_color_manual(
+    values = c("dodgerblue4", "chartreuse", "aquamarine"), labels = c("4 cyl", "6 cyl", "blah")
+) + theme_bw(base_size = 24)
+
+library(scales)
+dplot + scale_y_continuous(trans = "log", breaks = c(500, 1000, 3000), labels = dollar)
+```
+
+```{r}
+mtplot
+dplot
+library(gridExtra)
+grid.arrange(mtplot, dplot, nrow = 1, widths = c(.7, .3))
+```
+
+```{r}
+ggplot(diam, aes(x = carat)) +
+    geom_bar() +
+    coord_polar()
+```
+
+```{r}
+mtplot + geom_smooth(method = "lm") +
+    #scale_x_continuous(limits = c(2.5, 3.75)) +
+    coord_cartesian(xlim = c(2.5, 3.75)) +
+    annotate(geom = "text", x = c(3, 3.5), y = 30, label = c("this is my label", "hi"))
+```
+
+
+
+
+
+
