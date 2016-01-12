@@ -1,0 +1,136 @@
+---
+title: "Lab 1 Live"
+author: "Gregor Thomas"
+date: "January 11, 2016"
+output: html_document
+---
+
+Where we left off...
+
+```{r}
+library(ggplot2)
+mt = mtcars
+mt$cyl = as.factor(mt$cyl)
+# and redefine the plot with the new data
+mtplot = ggplot(mt, aes(x = wt, y = mpg, color = cyl)) +
+    geom_point()
+```
+
+Explore some themes
+
+```{r}
+library(ggthemes)
+mtplot + theme_economist() +
+    labs(title = "Economist theme")
+
+mtplot + theme_fivethirtyeight()
+mtplot + theme_excel()
+```
+
+Faceting with `facet_wrap` is good for one variable
+
+```{r}
+mtplot + facet_wrap(~ gear)
+
+mtplot + facet_wrap(~ gear, ncol = 2)
+mtplot + facet_wrap(~ gear, scales = "free")
+```
+
+Bigger data for better faceting:
+
+```{r}
+diam = diamonds[1:5000, ]
+
+dplot =ggplot(diam, aes(x = carat, y = price)) +
+    geom_point()
+
+dplot + facet_wrap(~ color)
+```
+
+`facet_grid` for 2 or more variables
+
+```{r}
+dplot + facet_grid(color ~ clarity)
+```
+
+Dealing with overplotting
+
+```{r}
+ggplot(diamonds, aes(x = carat, y = price)) + geom_point(alpha = 0.05, shape = 20)
+
+ggplot(diamonds, aes(x = carat, y = price)) +
+    stat_bin_2d(bins = 60)
+
+ggplot(diamonds, aes(x = carat, y = price)) +
+    stat_bin_hex(bins = 60)
+```
+
+Scale functions do a lot
+
+```{r}
+mtplot + scale_color_brewer(type = "qual") + theme_bw()
+
+mtplot + scale_color_manual(
+    values = c("dodgerblue4", "chartreuse", "aquamarine"), labels = c("4 cyl", "6 cyl", "blah")
+) + theme_bw(base_size = 24)
+
+library(scales)
+dplot + scale_y_continuous(trans = "log", breaks = c(500, 1000, 3000), labels = dollar)
+```
+
+Sticking ggplots together
+
+```{r}
+library(gridExtra)
+grid.arrange(mtplot, dplot, nrow = 1, widths = c(.7, .3))
+```
+
+Tranforming coordinate systems
+
+```{r}
+ggplot(diam, aes(x = carat)) +
+    geom_bar() +
+    coord_polar()
+```
+
+Zooming vs. clipping
+
+```{r}
+# we can plot regression lines
+mtplot + geom_smooth(method = "lm")
+
+# scales can be used to set limits
+# but data outside the limits is discarded!
+mtplot + geom_smooth(method = "lm") +
+    scale_x_continuous(limits = c(2.5, 3.75))
+
+# to keep all the data (only rarely necessary)
+# use a coord_ function to set the limits instead
+mtplot + geom_smooth(method = "lm") +
+    #scale_x_continuous(limits = c(2.5, 3.75)) +
+    coord_cartesian(xlim = c(2.5, 3.75)) 
+```
+
+```{r}
+# annotate is super useful for adding labels
+# or other little geoms that aren't in a data frame
+mtplot + geom_smooth(method = "lm") +
+    coord_cartesian(xlim = c(2.5, 3.75)) +
+    annotate(geom = "text", x = c(3, 3.5), y = 30,
+             label = c("this is my label", "hi"))
+```
+
+Using `dput()` is handy to share data in a copy/pasteable way.
+
+```{r}
+library(ggplot2)
+DoverData = structure(list(Gear = c(2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L), Tow = c(1L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L), MLL = c(36L, 27L, 28L, 29L, 31L, 32L, 33L, 34L, 37L, 38L), Number = c(1L, 1L, 1L, 2L, 5L, 2L, 2L, 1L, 2L, 3L), SSR = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1), Raised = c(1, 1, 1, 2, 5, 2, 2, 1, 2, 3)), .Names = c("Gear", "Tow", "MLL", "Number", "SSR", "Raised"), row.names = c(NA, 10L), class = "data.frame")
+
+DoverData$Gear[8:10] = 1
+
+ggplot(DoverData, aes(MLL)) + 
+    geom_histogram(binwidth=5) + 
+    facet_wrap(~Gear, scales="free")
+```
+
+
