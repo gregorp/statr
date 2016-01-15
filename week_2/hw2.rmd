@@ -1,0 +1,47 @@
+---
+title: "StatR 502 Homework 2"
+author: "Gregor Thomas"
+date: "Due Thursday, Jan. 21, 2016, 6:30 pm"
+output:
+  html_document:
+    theme: cosmo
+    toc: yes
+---
+
+Submission guidelines: please submit either a PDF or Word document created in `knitr`. As always, ask in the discussion forum if you have
+trouble!
+
+## 1: Pulling data from Excel, transforming it, and presenting it
+
+The file `king.xlsx` contains crime data for King County downloaded from Washington's [Office of Financial Management](http://www.ofm.wa.gov/sac/pdf/cjdb/datades.pdf).
+
+Using `readxl` (or another R package if you like; I have used `xlsx` and `XLConnect` in the past), read the sheet into R and get yourself two data frames: (1) the population by year (rows 5-13 of the Excel spreadsheet) and (2) the number of murders reported each year using both the SRS and NIBRS reporting systems (rows 19 and 31 of the spreadsheet).
+
+Melt each of your data frames so that there is a single `year` column. In the murder rate data frame create a single column of reported murders that uses the NIBRS data when that is available, and otherwise uses SRS data.
+
+The population data has variables (gender and age group) coded in one column. Separate these into separate columns. Make sure both data frames have well-named columns and that each column is an appropriate data type. (Sex and age group should be factors.) 
+
+**(a)** Show the head of each data frame.
+
+**(b)** Make a plot of population over time, by age group and gender. Perhaps color by one, and facet by another? Which way do you think tells the more interesting story?
+
+**(c)** Make a data frame of *total* population by year (use `group_by` and `summarize`), and join it to the reported murders data. I recommend using `dplyr::left_join`, but `base::merge` also works. 
+
+Make a data.frame of total population, total number of reported murders, and murder rate (reported murders per 100,000 population) for the most recent 6 years. Present this data frame as a nicely formatted table, in the original format (where each year is it's own column). To convert back to this format you can use either `reshape2::dcast.data.frame` or `tidyr::spread`.
+
+*Note:* For displaying a table in a document, the easiest option (if you're authoring in markdown) is probably `pander::pander` or `knitr::kable`.
+
+As a quick example (you can view the .Rmd source of this homework to see how this is coded):
+
+```{r, echo = F}
+# echo = F means "don't show the code"
+pander::pander(mtcars[1:4, 1:6])
+```
+
+## Problems from Gelman & Hill
+
+Section 4.9 (pp. 74-75), **do problems 1, 4, 5, 6, 8**. In your write-up, please label them as G&H X, where X is the problem number.
+
+When G&H refer to a "folder" for data, it can be found and downloaded online at this site: <http://stat.columbia.edu/~gelman/arm//examples/>.
+
+

@@ -1,0 +1,246 @@
+---
+title: 'StatR 502 Lecture 2: Transformations and Diagnostics'
+author: "Gregor Thomas"
+date: "Thursday, January 14, 2016"
+output:
+  slidy_presentation:
+    fig_height: 3.5
+    fig_width: 5
+    highlights: espresso
+    incremental: yes
+    theme: cosmo
+  beamer_presentation:
+    colortheme: dolphin
+    fig_height: 3.5
+    fig_width: 5
+    highlight: kate
+    incremental: yes
+    theme: boadilla
+---
+
+## Announcements:
+
+```{r, echo = FALSE, include=FALSE}
+packages = c("ggplot2", "arm", "dplyr", "stringr",
+             "magrittr", "reshape2", "tidyr")
+lapply(packages, library, character.only = T)
+theme_set(theme_bw())
+```
+
+## Tonight's Menu:
+
+* Quick review
+* Linear model assumptions
+* Continuous and discrete predictors
+* Transformations: why and how
+* Model comparison and evaluation:
+    - R^2
+    - LRT
+    - AIC
+
+
+## Quick Review
+
+Things you should know off the top of your head
+
+- The beta hat waltz!
+- What is the statistical justification for least-squares regression?
+- The cut-off for a 95% normal confidence interval (it's often rounded to 2...)
+- How can you find the 95% normal confidence interval using R's normal distribution functions?
+- In ggplot, what goes inside `aes()`, and what doesn't?
+
+## Quick Review
+
+Things you should know off the top of your head
+
+- The beta hat waltz!
+    - $\hat{\beta} = (X'X)^{-1}X' y$
+- What is the statistical justification for least-squares regression?
+    - The least-squares estimate is the Maximum Likelihood Estimate (MLE).
+- The z-score for 95% normal confidence interval:
+    - **1.96**
+- How can you find the 95% normal confidence interval using R's normal distribution functions?
+    - `qnorm(0.975)`
+- In ggplot, what goes inside `aes()`, and what doesn't?
+    - Mappings from *unquoted* column names to plot aesthetics go inside `aes()`
+    - The name of you data frame and setting aesthetics to constants *never* go inside `aes()`.
+
+## Linear Model Assumptions
+
+This is covered very well in Gelman & Hill (back in Chapter 3, pp 45-46). Go back and read it again.
+
+1. Validity
+2. Additivity and linearity
+3. Independence of errors
+4. Equal variance of errors
+5. Normality of errors
+
+**Super-important note:** *Data* is not assumed to be normal. Only *errors* are assumed to be normal.
+
+## Discrete and continuous predictors {.build}
+
+- What do we mean by *slope*? What about *intercept*?
+- Can a model have more than one slope and intercept?
+- How many lines are we really fitting in each of these
+    - `lm(mpg ~ wt)`
+    - `lm(mpg ~ wt + factor(cyl))`
+    - `lm(mpg ~ wt * factor(cyl))`
+
+# Transformations
+
+## Linear transformations
+
+- A *linear transformation* is adding an multiplying, $ax + b$.
+
+- Linear regression finds **the best** linear transformation of predictors $X$ to get close to the response $y$. 
+
+- Pre-processing data $X$ by linear transformations **has no effect** on the quality of fit of a linear model (why?).
+
+- But linear transformations are often useful, why?
+
+## Linear transformations
+
+We use linear transformations to do ourselves a favor in interpreting the model. Having input variables on similar scales lets us compare them better, deciding relative importance *based on the observed range of hte data*. Centering the response lets us not worry about the intercept.
+
+In addition to the book, [Gelman's blog](http://andrewgelman.com/2009/07/11/when_to_standar/) has a nice discussion of "When to standardize regression inputs and when to leave them alone".
+
+Some methods you'll hear about try to automatically compare variables, and expect that they are on the same scale, (PCA, kNN, Lasso).
+
+The `scale` function can be used to center data, or you can subtract the mean and divide by the variance yourself.
+
+## Nonlinear transformations
+
+Anything that can't be simplified to $ax + b$ is a nonlinear transformation.
+
+Nonlinear transformations **do** affect the model fit (often to improve it!), but they can interpretation more difficult.
+
+Log transformations are almost always worth trying on all-positive data. (Some people like `log1p` for $\log(x + 1)$ for data that includes zeros.)
+
+## Binning continuous data
+
+- How does the regression equation change?
+- Often a non-linear transformation can achieve a similar effect
+- Maybe try a `GAM` instead?
+- When it works it can make interpretation clear
+
+If you choose to do it, the `cut()` function is your friend.
+
+**Domain-specific knowledge** - do what makes sense.
+
+# Assessing model fit
+
+## Assessing model fit
+
+- Magical metrics
+- R-squared
+- Likelihood Ratio Test
+- ANOVA and F-Tests
+- AIC and BIC
+
+## Magical metrics
+
+Everyone wants a magical metric that will tell them which model is best. **There is no such thing.**
+
+I'm going to begin and end this topic by saying that the best variable and model selector for inference is someone with **domain-specific knowledge**, hopefully you!
+
+Of course, you should use statistical tests and metrics of model fit for guidance, but to follow them blindly is foolish.
+
+## R squared {.smaller}
+
+Hopefully HW1 got you thinking about R^2, and drove the definition home. R-squared is the proportion of variance in $y$ that can "explained" by variance in $x$.
+
+One big problem with r-squared is that it only gets better as you add variables. 
+
+It's also dependent on the scale the scale... if we transform data and the variance changes, R^2 will not really be comparable.
+
+## Likelihood Ratio Test
+
+- Similar to ANOVA
+- Powerful test (more powerful than an F-test)
+- Good theory behind it
+- Models must be nested
+
+## Likelihood ratio tests
+
+A likelihood ratio test (LRT) is exactly what it sounds like. It's based on the ratio of likelihoods of two models (null hypothesis model over alternative hypothesis model) The actual test statistic is just like -2 times the log of the LR
+
+$$
+\begin{aligned}
+\mathrm{LRT \, statistic} &= -2\log \Big(\frac{L_{null}}{L_{alt}}\Big)
+&= \mathrm{deviance}(\mathrm{null}) - \mathrm{deviance}(\mathrm{alt})
+\end{aligned}
+$$
+
+The LRT statistic has a chi-squared distribution, with degrees of freedom of the *difference* of the degrees of freedom of the two models. <font color='blue'>The LRT test statistic is only valid for nested models.</font>
+
+---
+
+```{r, message=FALSE}
+mod1 = lm(mpg ~ wt, data = mtcars)
+mod2 = lm(mpg ~ wt + disp, data = mtcars)
+mod3 = lm(mpg ~ disp * wt, data = mtcars)
+library(lmtest)
+lrtest(mod1, mod2, mod3)
+```
+
+
+## AIC
+
+The *Akaike Information Criterion* is based on the likelihood, but it has a penalty for adding extra parameters.
+
+$$
+\mathrm{AIC} = 2k - 2 \log(L)
+$$
+
+Where $L$ is the likelihood (up to a constant), and $k$ is the number of estimated parameters.
+
+Lower is better.
+
+## AIC
+
+Remember, lower is better.
+
+### How much lower? 
+
+AIC is based on theory, but there aren't hard cut-offs. Burnham & Anderson literally "wrote the book" on using AIC, and they recommend a Rule of Thumb for comparing AICs:
+
+- difference less than 2: *no detectable difference*
+- difference less than 10: *some evidence the lower AIC model is better*
+- difference greater than 10: *strong evidence the lower AIC model is better*
+
+Some divide the "some evidence" category into "weak evidence" for below 6 or 7 and "moderate evidence" from there until 10.
+
+In R, you can use `AIC()` or `extractAIC()`. The former is nice for comparing models, `AIC(mod1, mod2)`.
+
+## Disadvantages of AIC
+
+AIC is strictly relative, and compares models fit to the same data (same response, at least). If I tell you I have a model with AIC of 166, it doesn't tell you anything about how "good" the fit is.
+
+With large data sets, AIC's penalty of 2 per fitted parameter doesn't seem to be enough.
+
+## Variations
+
+Due to the large data problem, there are two adaptations of AIC that increase the penalty based on the amount of data. 
+
+Corrected AIC (AICc) and Bayesian Information Criterion (BIC):
+
+$$
+\mathrm{AICc} = \mathrm{AIC} + \frac{2k(k+1)}{n-k-1}
+$$
+
+$$
+\mathrm{BIC} = \log(n)k - 2 \log(L)
+$$
+
+where $n$ is the number of observations in the data and $k$ is the number of estimated coefficients.
+
+There's argument about these, many people feel AICc is on stronger theoretic footing. From a practical point of view, the results are often comparable. For me, I use BIC most because it's in the default `stats` package, to get `AICc` you'd need a special package such as `AICcmodavg`.
+
+## Ending note:
+
+Don't ignore **domain specific knowledge** in variable selection! 
+
+Of course, you should use statistical tests and metrics of model fit for guidance, but to follow them blindly is foolish.
+
+
+
