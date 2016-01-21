@@ -97,7 +97,7 @@ mt.glm = glm(mpg ~ wt, data = mtcars, family = gaussian(link = "identity"))
 all.equal(coef(mt.lm), coef(mt.glm))
 ```
 
-The key difference is the `family` argument, which describes the error distribution and specify a link function.
+The key difference is the `family` argument, which describes the error distribution and specifies a link function.
 
 ---
 
@@ -189,17 +189,6 @@ obese %>%
 ---
 
 ```{r}
-# using dcast for the totals
-# this is an example of something dcast can do but tidyr::spread can't
-# obesity defines rows  ~  demog becomes multiple columns
-obese %>% dcast(obese ~ demog, fun.aggregate = length) 
-# but to get the proportions, you'd probably convert
-# to a matrix and use prop.table()
-```
-
----
-
-```{r}
 table(obese$obese, obese$female) %>%
     prop.table(margin = 2) %>%
     round(2)
@@ -209,6 +198,7 @@ table(obese$obese, obese$female) %>%
 
 - Why is demography coded this way?
 - What's nice about the way sex is coded?
+    - Reference levels should usually be the biggest group
 - Check-in about factors and modeling: should we convert `female` to a factor? How many coefficients will we get by using `demog`?
 
 
