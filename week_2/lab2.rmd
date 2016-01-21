@@ -1,0 +1,247 @@
+---
+title: 'Lab 2: Data Manipulation'
+author: "Gregor Thomas"
+date: "January 15, 2016"
+output: ioslides_presentation
+---
+
+## Tonight:
+
+- Pivots: wide-to-long and long-to-wide
+    - `tidyr` and `reshape2`
+- Full on data munging
+    - `dplyr`
+- Tidy model output and summary
+    - `broom`
+
+## Tools
+
+R everything we do tonight can be done many different ways, in base R or using any number of packages. Instead of focusing on that, I'm highlighting a small number of relatively new, well-maintained packages that have helped me get these jobs done easily and efficiently.
+
+# Wide-to-long, long-to-wide
+
+## `tidyr`
+
+`tidyr` is the simplest tool for reshaping data - and the most limited. It does what you need 95% of the time, but sometimes you might need to bring in `resahpe2` for some extra features.
+
+---
+
+```{r}
+reentry = read.csv("reentry.csv")
+head(reentry[1:6])
+```
+
+Pretty nice data table for a person to read; **terrible** for working with.
+
+---
+
+```{r}
+library(tidyr)
+# gather many columns into two key/value columns
+#    create a "key" column called months
+#    create a "value" column called percent
+#    do this for all *but* the first column
+reentry = gather(reentry, key = months, value = percent, -1)
+head(reentry)
+```
+
+## Going back to wide:
+
+```{r}
+spread(reentry, key = months, value = percent)[1:6, 1:6]
+```
+
+## Tidy Data Principles
+
+- Data should be stored in columns, not in column names
+- All values that measure the same thing should be in the same column
+
+TODO link to Tidy Data paper
+
+Data that follows Tidy Data principles is easy to manipulate and query, easy to 
+plot (with ggplot, at least), and easy to use in a model.
+
+---
+
+```{r, eval = FALSE}
+# TODO eval truee
+fortunes::fortune("tidy data")
+```
+
+## `reshape2`
+
+`reshape2` can do the basic gather/spread that `tidyr` does, with some extra options. Instead of gather/spread, the commands are melt/cast.
+
+---
+
+```{r}
+library(reshape2)
+re2 = read.csv("reentry.csv")
+re2 = melt(re2, id.vars = "X", variable.name = "months", value.name = "percent")
+#     consistent Hadley syntax: function names use _ for word separation,
+#     arguments use . for word separation
+identical(reentry, re2)
+```
+
+- `tidyr::gather` uses *non-standard evaluation*: i.e., unquoted column names
+- `reshape2::melt` uses *standard evaluation*: column names must be strings (with quotes)
+- `tidyr::gather` works on data frames only
+- `reshap2::melt` works on data frames, lists, arrays, tables, matrices
+
+## Other `tidyr` utilities
+
+```{r}
+reentry = separate(reentry, X, into = c("county", "outcome"))
+head(reentry)
+```
+
+- `unite` combines columns together (opposite of `separate`)
+- `fill` fills in missing values (using the last observation)
+- `complete` makes sure there is a row for every combination of two or more variables (filling in with `NA` if values are unobserved)
+
+## So nice!
+
+Look how easy it is to plot!
+
+```{r, fit.width = 8, fig.height = 3}
+library(ggplot2)
+ggplot(reentry, aes(x = months, y = percent, color = county)) +
+    geom_line(aes(group = county)) +
+    geom_point() +
+    facet_wrap(~ outcome)
+```
+
+We'll clean it up even more.
+
+## Casting
+
+TODO: add or cut.
+
+# Data manipulation with `dplyr`
+
+## verbs
+
+`dplyr` has many simple commands, *verbs*, that try to do one thing very well. They all work on data frames.
+
+- `mutate` adds columns
+- `arrange` sorts
+- `filter` omits rows that don't match condition(s)
+- `select` omits columns that aren't selected
+- `slice` works like filter, but uses row numbers instead of logical conditions
+- `rename` changes column names
+
+## groups
+
+- `group_by` adds a **grouping** to a data frame 
+    - all subsequent `dplyr` commands will be done to each group individually, as if each group is its own data frame
+- `ungroup` removes a grouping
+- `summarize` collapses each group to a single row, adding summary columns
+    - the only columns kept are the grouping columns and new summary columns
+
+## Non-standard evaluation
+
+All of the `dplyr` verbs use NSE (non-standard evaluation) - unquoted column names.
+
+Hadley is creating a coding style/convention that they all have standard-evaluating counterparts with the same name followed by an underscore.
+
+- `mutate_` is a standard-evaluating version of `mutate`
+- `spread_` is a standard-evaluating version of `spread`
+- `aes_` is a standard-evaluating version of `aes`
+
+You should use the standard-evaluating versions *inside functions* - when writing general purpose code that might be called by other code, that is expected to operate on different data.
+
+In everyday use, when exploring or analyzing a specific data set, the NSE versions offer nice convenience.
+
+## The Pipe
+
+TODO insert pipe image
+
+All of these simple verbs are nice for doing simple things one step at a time. What makes `dplyr` really shine is the pipe operator, `%>%`, borrowed from the `magrittr` package.
+
+The pipe does something very simple - it takes the result of whatever is on the left and *pipes* it to the function on the right as the first argument.
+
+## Simple piping
+
+```{r}
+library(dplyr)
+1:5 %>% mean
+mtcars %>% head(2)
+```
+
+The above uses are illustrative, but pointless in practice.
+
+## Lots of pipes {.smaller}
+
+Piping is useful when you would normally have lots of *nested* funcitons. Piping lets you write them left-to-right instead of inside-out.
+
+```{r}
+foo = factor(c(4, 8, NA, -1, -1, 2, NA, 10))
+# if I want to take the average of the first 5 rows of foo, omitting missing values:
+# option 1
+bar1 = mean(na.omit(as.numeric(as.character(foo))))
+
+# option 2
+bar2 = as.character(foo)
+bar2 = as.numeric(bar2)
+bar2 = na.omit(bar2)
+bar2 = mean(bar2)
+
+# option 3
+bar3 = foo %>% as.character %>% as.numeric %>% na.omit %>% mean
+
+identical(bar1, bar2, bar3)
+```
+
+## Piping with `dplyr`
+
+Piping is especially useful chaining `dplyr` verbs together. Every verb expects a data frame as its first argument, and every verb returns a data frame as its outuput, so they go together nicely.
+
+# `dplyr` in action
+
+## Some notes... {.smaller}
+
+- Don't let you lines get too long! I almost always start a new line after `%>%`.
+    - RStudio's *reformat code* utility can be very helpful: Code > Reformat code.
+- `dplyr` is **much** faster than base R functions doing the same tasks
+    - However, if you *really* need speed & efficiency, `data.table` is even faster.
+    - `dplyr` functions and syntax will work with `data.table` objects to get you partway there.
+- There are many `dplyr` commands I did not show you - skimming some of the `dplyr` vignettes would be a good way to dive deeper into this topic. 
+    -  joining operations: `inner_join`, `left_join`, etc., see `?join`
+    -  helpers `n()`, `distinct`, `desc`
+    - `bind_rows` and `bind_cols` are faster versions of `cbind` and `rbind` (and they can take lists are arguments!)
+    
+---
+    
+- `do()` can execute *any* function on each of your grouped sub-tables and return a list, so you can 
+    - make a `ggplot` for each group
+    - fit a model to each group
+    - write each group to its own CSV
+- One of the biggest features: `dplyr` can connect to a SQL database on the back-end, *translate dplyr code to SQL code*, and execute it for you.
+
+---
+
+Sometimes you want to pipe to a function that has a data argument, *but the first argument is not the data argument* :(
+
+The pipe uses some <font color = "forestgreen">dark magic</font> to let this happen - you can use a dot `.` to mark where the data should go:
+
+```{r}
+mtcars %>% 
+    filter(cyl == 4) %>% 
+    lm(mpg ~ wt, data = .) %>%  # dot marks the spot
+    coef                        
+```
+
+
+## `broom` tidy models
+
+TODO picture of model with broom?
+
+## Three ways to sweep up
+
+`broom` has 3 main functions that work on a *wide* variety of models and tests.
+
+- `tidy` gives a data frame that summarizes model coefficients
+- `augment` adds columns to the data you fit the model on
+- `glance` gives a one-row summary of a model, with fit statistics, degrees of freedom, etc.
+
+
