@@ -1,0 +1,448 @@
+---
+title: 'StatR 502 Lecture 3: Logistic Regression'
+author: "Gregor Thomas"
+date: "Thursday, January 21, 2016"
+output:
+  slidy_presentation:
+    fig_height: 3.5
+    fig_width: 5
+    highlights: pygments
+    incremental: yes
+    theme: cosmo
+  ioslides_presentation:
+    highlight: kate
+    incremental: yes
+  beamer_presentation:
+    colortheme: dolphin
+    fig_height: 3.5
+    fig_width: 5
+    highlight: kate
+    incremental: yes
+    theme: boadilla
+---
+
+## Tonight's Menu:
+
+```{r, echo = FALSE, include=FALSE}
+packages = c("ggplot2", "arm", "dplyr", "stringr", "broom", 
+             "magrittr", "reshape2", "tidyr", "gridExtra")
+lapply(packages, library, character.only = T)
+theme_set(theme_bw(10))
+```
+
+* Quick review
+* Jumping right in to Logistic Regression!
+    * Motivation
+    * Quick example
+    * Some diagnostics
+    * More examples
+    * Final thoughts
+    
+## Quick Review {.smaller}
+
+Things you should know off the top of your head
+
+- The beta hat waltz!
+- The z-score for a 95% normal confidence interval 
+- AIC: which direction is better?
+- What assumption is key for a Likelihood Ratio Test?
+- The *most* important assumption for linear regression
+- The *least* important assumption for linear regression
+- What is the point of linear transformations of data?
+- What is the difference between `dplyr::mutate` and `dplyr::summarize`?
+
+## Quick Review {.smaller}
+
+Things you should know off the top of your head
+
+- The beta hat waltz! $\hat{\beta} = (X'X)^{-1}X' y$
+- The z-score for 95% normal confidence interval: **1.96** (in R: `qnorm(0.975)`)
+- AIC: which direction is better? Lower is better.
+- What assumption is key for a Likelihood Ratio Test? - The models must be *nested*.
+- The most important assumption regression assumption:
+    - *validity,* your data should map to the question you're trying to answer.
+- The least important regression assumption: 
+    - *normality of errors*
+    - **Not an assumption:** normality of data
+- What is the point of linear transformations of data: *make interpretation easier*
+- What is the difference between `dplyr::mutate` and `dplyr::summarize`?
+    - `mutate` adds columns to the existing data, `summarize` collapses rows down to the group level and adds group summary columns.
+
+## Generalized Linear Models 
+
+Logistic is the most common kind of GLM, we'll talk about others next week.
+
+Linear model:
+  
+$$
+E(y) = X\beta
+$$
+
+Generalized Linear Model:
+
+$$
+g(E(y)) = X\beta \\ E(y) = g^{-1} (X \beta )
+$$
+
+The function $g$ is called the "link function", and $X\beta$ is called the "linear predictor."
+
+A linear model is a special case of a GLM when $g$ is the identity function ($g(y) = y$).
+
+## Our first GLM is an LM
+
+```{r}
+mt.lm = lm(mpg ~ wt, data = mtcars)
+mt.glm = glm(mpg ~ wt, data = mtcars, family = gaussian(link = "identity"))
+
+all.equal(coef(mt.lm), coef(mt.glm))
+```
+
+The key difference is the `family` argument, which describes the error distribution and specifies a link function.
+
+---
+
+```{r}
+summary(mt.lm)
+```
+
+---
+
+```{r}
+summary(mt.glm)
+```
+
+In this case, the only difference is how the results are presented.
+
+## Logistic regression
+
+Every GLM has a (*exponential family*) distribution, and a link function.
+
+When our outcome is binary
+we use the binomial distribution, which most commonly uses the logit function as link:
+
+$$
+\mathrm{logit}(p) = \log\Big(\frac{p}{1-p}\Big)
+$$
+
+The inverse logit function (which is rightly the logistic function, but also sometimes called the "expit" function is)
+
+$$
+\mathrm{expit}(x) = \frac{\exp(x)}{\exp(x) + 1}
+$$
+
+## Some quick plotting
+
+```{r}
+logit.plot = ggplot(data.frame(p = c(0.01, .99)), aes(p)) + 
+    stat_function(fun = logit) +
+    labs(title = "Logit",
+         y = expression(paste("X", beta, " (log odds-ratio)")),
+         x = "Probability") +
+    coord_equal(xlim = c(-0.5, 1.5)) +
+    scale_x_continuous(breaks = c(0, 1))
+invlogit.plot = ggplot(data.frame(xbeta = c(-5, 5)), aes(xbeta)) + 
+    stat_function(fun = invlogit) +
+    labs(title = "Inverse Logit\n(or Logistic or Expit)",
+         x = expression(paste("X", beta, " (log odds-ratio)")),
+         y = "Probability") +
+    coord_equal(ylim = c(-.5, 1.5)) +
+    scale_y_continuous(breaks = c(0, 1))
+```
+
+---
+
+```{r, fig.width = 8, fig.height = 4.5}
+library(gridExtra)
+grid.arrange(logit.plot, invlogit.plot, nrow = 1)
+```
+
+## Let's do logistic regression!
+
+We're going to start off with a mostly categorical data set, then we'll look at G&H's arsenic data to get practice with continuous variables.
+
+```{r}
+obese = read.csv("obese11.csv")
+```
+
+The first thing we should do is get a sense of the data.
+
+```{r}
+# the base r way
+# counts by demography
+table(obese$obese, obese$demog)
+table(obese$obese, obese$demog) %>%
+    prop.table(margin = 2) %>%
+    round(2)
+```
+
+---
+
+```{r}
+# with dplyr
+obese %>% 
+    group_by(demog) %>%
+    mutate(demog.n = n()) %>%
+    group_by(demog, obese) %>%
+    summarize(n = n(), prop = round(n / first(demog.n), 2))
+```
+
+---
+
+```{r}
+table(obese$obese, obese$female) %>%
+    prop.table(margin = 2) %>%
+    round(2)
+```
+
+### What do you think about the data coding?
+
+- Why is demography coded this way?
+- What's nice about the way sex is coded?
+    - Reference levels should usually be the biggest group
+- Check-in about factors and modeling: should we convert `female` to a factor? How many coefficients will we get by using `demog`?
+
+
+## Model time {.smaller}
+
+Let's fit a couple simple models:
+```{r}
+mod.f = glm(obese ~ female, data = obese, family = binomial(link = "logit"))
+mod.fd = glm(obese ~ female + demog, data = obese, family = binomial)
+display(mod.f)
+display(mod.fd)
+```
+
+## Deviance
+
+The new output includes *deviance*, both null and residual.
+
+Deviance is defined as 
+
+$$
+\mathrm{Deviance} = -2\log(L)
+$$
+
+So it ties right in with AIC and the LRT test statistic. *Null deviance* is the deviance of a model with only a single intercept term. The *residual deviance* is the deviance of the current model.
+
+## Null deviance
+
+```{r}
+mod.null = glm(obese ~ 1, data = obese, family = binomial)
+display(mod.null)
+```
+
+The null deviance is the deviance of the model fit with one parameter (the intercept). It gives a useful baseline.
+
+What probability does the intercept correspond to?
+
+---
+
+The intercept gives the overall probability of the response. We can get there a few ways:
+
+```{r}
+# by default, predict will give the *linear predictor* value
+predict(mod.null, newdata = data.frame(x = 1))
+# with GLMs, usually we want the *response*, with the link function applied
+predict(mod.null, newdata = data.frame(x = 1), type = "response", se.fit = T)
+invlogit(coef(mod.null)) # directly from the model coef
+mean(obese$obese)        # directly from the data
+```
+
+## Exploratory Interlude
+
+Take a look glance at the codebook (posted online), download the data (if you haven't already), and fit some logistic models.
+
+## A little model comparison
+
+Of course we should look at the AIC
+
+```{r}
+AIC(mod.null, mod.f, mod.fd)
+BIC(mod.null, mod.f, mod.fd)
+```
+
+## Likelihood ratio tests
+
+The LRT test statistic is the difference in deviances.
+
+$$
+\begin{aligned}
+\mathrm{LRT \, statistic} &= -2\log \Big(\frac{L_{null}}{L_{alt}}\Big) \\
+&= -2 \log \Big(L_{null}\Big) - (-2) \log \Big(L_{alt}\Big) \\
+&= \mathrm{deviance}(\mathrm{null}) - \mathrm{deviance}(\mathrm{alt})
+\end{aligned}
+$$
+
+The LRT statistic has a chi-squared distribution, with degrees of freedom of the *difference* of the degrees of freedom of the two models. <font color='blue'>The LRT test statistic is only valid for nested models.</font>
+
+---
+
+```{r}
+library(lmtest)
+lrtest(mod.f, mod.fd)
+```
+
+## Interpreting logistic regression coefficients
+
+The linear predictor corresponds to the *log-odds*, so a single coefficient estimate is the *change in the log-odds* per *unit change in the predictor*...  pretty terrible to explain.
+
+Exponentiating the predictors gets us **multipliers** of the odds ratio (why multiplicative, not additive?), which is better.
+
+---
+
+```{r}
+coef(mod.f)
+```
+
+- The log odds that a female subject in this data is obese is -.6 less than the log odds that a male subject is obese.
+
+- The odds that a female subject in this data is obese are `exp(-0.6)` = `r round(exp(-0.6), 4)` times the odds that a male subject is obese.
+
+(Taking no other variables into account.)
+
+### What does multiplying the log-odds do to the probability?
+
+Depends on where you start, that's what makes things hard. 
+
+- At the tails (when $p$ is close to 0 or 1), multiplying the odds-ratio is approximately equal to multiplying the (smaller) probability.
+    - At $p = 0.01$, doubling the odds-ratio is very close to doubling the probability.      
+Closer to the middle the changes aren't as extreme
+    - At $p = 0.5$, (odds-ratio = 1), doubling the odd-ratio (it goes 2) corresponds to a probability of $p = 0.6667$.
+
+## We could write functions...
+
+See if you can define two functions, `prob_to_or()` and `or_to_prob()`. (Use `logit()` and `arm::invlogit()` as needed.)
+
+Remember
+
+- $\mathrm{logit}(p) = \log\Big(\frac{p}{1-p}\Big)$
+- $\mathrm{expit}(x) = \frac{\exp(x)}{\exp(x) + 1}$
+- $\mathrm{OR} = \frac{p}{1-p}$
+
+## One way to do it:
+
+```{r}
+prob_to_or = function(p) {
+    return(p / (1 - p))
+}
+
+or_to_prob = function(or) {
+    return(invlogit(log(or)))
+}
+
+p = 0.01
+p %>% prob_to_or %>% prod(2) %>% or_to_prob
+p = 0.5
+p %>% prob_to_or %>% prod(2) %>% or_to_prob
+```
+## Adding to our plot duo
+
+```{r, fig.width=7, fig.height = 2.2}
+or.plot = ggplot(data.frame(p = c(0.01, .99)), aes(p)) +
+stat_function(fun = prob_to_or) +
+labs(title = "Odds Ratio vs Probability",
+x = "Probability",
+y = "Odds Ratio")
+
+grid.arrange(logit.plot, invlogit.plot, or.plot, nrow = 1)
+```
+
+## Visualizing model results
+
+First let's sweep up the data:
+
+
+```{r}
+fd.coef = tidy(mod.fd)
+fd.coef = mutate(
+    fd.coef,
+    term = factor(term),
+    term = reorder(term, X = estimate),
+    exp.estimate = exp(estimate),
+    exp.se = exp(std.error)
+)
+```
+
+## Visualizing model results
+
+Log-odds, the scale is hard to ~~read~~ interpret!
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(fig.width = 5, fig.height = 3)
+```
+
+
+```{r}
+fd.logodds = ggplot(fd.coef, aes(x = estimate, y = term)) +
+    geom_errorbarh(aes(xmin = estimate - 2 * std.error,
+                       xmax = estimate + 2 * std.error),
+                   height = 0.2, color = "gray60") +
+    geom_point() +
+    geom_vline(xintercept = 0, color = "dodgerblue4")
+fd.logodds
+```
+
+## Visualizing model results
+
+Same as before but using exponentiated coefficients (odds ratios). I find the x-scale here misleading, because multiplying by 0.5 is equal and opposite to multiplying by 2...
+
+```{r}
+fd.or = ggplot(fd.coef, aes(x = exp.estimate, y = term)) +
+    geom_errorbarh(aes(xmin = exp.estimate / exp.se^2,
+                       xmax = exp.estimate * exp.se^2),
+                   height = 0.2, color = "gray60") +
+    geom_point() +
+    geom_vline(xintercept = 1, color = "dodgerblue4")
+fd.or
+```
+
+---
+
+The OR, plotted on a log scale, is the best of both worlds: readable, interpretable labels *and* distance meaning the same thing on either side of 1.
+
+```{r}
+fd.or + scale_x_continuous(trans = "log", breaks = c(0.25, 0.5, 1, 2)) +
+    labs(x = "Odds Ratio")
+```
+
+## Getting back to probabilities
+
+As far as getting the actual probabilities, G&H rely a lot on `coef()` and matrix multiplication. I prefer to let `predict()` do the heavy lifting:
+
+```{r}
+# create some data
+pr.dat = expand.grid(unique(obese$female), levels(obese$demog))
+names(pr.dat) = c("female", "demog")
+head(pr.dat)
+```
+
+---
+
+```{r}
+pr.dat$phat = predict(mod.fd, newdata = pr.dat, type = "response") %>%
+    round(3)
+pr.dat
+```
+
+## Questions?
+
+- In lab, we'll take a look at continuous predictors with GLM (using the well-switching data from G&H), and explore more plotting options.
+
+- Considerations for transforming predictors are just about the same for GLMs as for LMs.
+
+
+## Other input options
+
+`glm` is nicely flexible when it comes to data formats for logistic regression. The most common is the format of the YRBS data: the response is one vector of 0's and 1's. You can also give two-column matrix as the response, the first column a count of successes, the second a count failures.
+
+A third option is to give a proportion of successes as the response and use the `weights` argument to specify the number of attempts, but this seems less stable.
+
+
+## How are GLM's calculated?
+
+You've maybe noticed there's been no new version of the "beta-hat waltz" for logistic regression. In fact, there's no closed-form solution to find the MLE. The solution is found numerically, searching the likelihood function for it's maximum. The usual method is:
+
+ 1. Calculate the log-likelihood's gradient w.r.t. the $\beta$'s, known among statisticians as <b>the score;</b>
+ 2. Using <font color='blue'>Iteratively Reweighted Least Squares (IRLS or IWLS)</font>, numerically push the score towards zero (a.k.a.  **solving the score equations**). Once you're close enough, you've found your $\hat{\beta}$'s.
+ 3. Take the second derivative of log-likelihood at $\beta=\hat{\beta}$, to calculate the SEs of $\hat{\beta}$.
+ 4. If the distribution has a scale/noise parameter $\phi$ (known in GLM as **the dispersion parameter**), you estimate it empirically "on the side" after finding $\hat{\beta}$ (just like we estimate $\hat{\sigma}^2$ in linear regression).
