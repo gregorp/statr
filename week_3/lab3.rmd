@@ -1,0 +1,238 @@
+---
+title: "Lab 3 Live"
+author: "Gregor Thomas"
+date: "January 25, 2016"
+output: html_document
+---
+
+Load some packages
+
+```{r, message = FALSE, results = "hide"}
+packages = c("ggplot2", "arm", "broom", "reshape2", "tidyr", "dplyr")
+lapply(packages, library, character.only = T)
+```
+
+Read in data and fit a model:
+
+```{r}
+wells = read.table("http://www.stat.columbia.edu/~gelman/arm/examples/arsenic/wells.dat")
+
+wells$dist.log = log(wells$dist)
+
+m_logd = glm(switch ~ dist.log, family = binomial(link = "logit"), data = wells)
+
+display(m_logd)
+```
+
+Plot similar to Fig. 5.9
+
+```{r}
+p = ggplot(wells, aes(x = dist.log, y = switch)) +
+    geom_point(position = position_jitter(height = 0.05),
+               size = 0.8, alpha = 0.4) +
+    stat_function(fun = function(x) {
+        invlogit(coef(m_logd)[1] + coef(m_logd)[2] * x)
+        })
+```
+
+```{r}
+well_a = augment(m_logd)
+ggplot(well_a, aes(x = dist.log, y = .resid)) +
+    geom_point(position = position_jitter(height = 0.1), size = 0.8, alpha = 0.4)
+```
+
+Binned residual plot
+
+```{r}
+well_bin = well_a %>%
+    mutate(
+        q_group = cut(dist.log,
+                      breaks = quantile(dist.log, seq(0, 1, length.out = 30), include.lowest = TRUE))
+    ) %>%
+    group_by(q_group) %>%
+    summarize(.resid = mean(.resid),
+              dist.log = mean(dist.log))
+
+ggplot(well_bin, aes(x = dist.log, y = .resid)) +
+    geom_point() +
+    geom_smooth()
+
+```
+
+
+```{r}
+wells$dist100 = wells$dist / 100
+mod = glm(switch ~ dist100 + log(arsenic), data = wells,
+          family = binomial)
+display(mod)
+```
+
+
+```{r}
+fill_in = function(x, n = 50) {
+    seq(from = min(x), to = max(x), length.out = n)
+}
+
+new_well = expand.grid(
+    dist100 = fill_in(wells$dist100),
+    arsenic = exp(fill_in(log(wells$arsenic)))
+)
+
+nw_plot = ggplot(new_well, aes(x = dist100, y = arsenic)) +
+    geom_point(size = 0.3)
+
+nw_plot
+nw_plot + scale_y_continuous(trans = "log")
+```
+
+```{r}
+pred = augment(mod, newdata = new_well, type.predict = "response")
+
+ggplot(pred, aes(x = dist100, y = arsenic)) +
+    geom_tile(aes(fill = .fitted)) +
+    stat_contour(aes(z = .fitted), colour = "black") +
+    scale_y_continuous(trans = "log") +
+    geom_point(data = wells, aes(colour = factor(switch)), alpha =  0.5) +
+    scale_color_manual(values = c("white", "green"))
+```
+
+To make the "confusion matrix" faceted plot we need to turn the model's probability-scale predictions into binary 1-0 prdictions. Because we're not doing any fancy adjustments, we'll just round the fitted values to the nearest 1 or 0.
+
+```{r}
+well_a2 = augment(mod, type.predict = "response")
+well_a2$predicted = round(well_a2$.fitted)
+
+# this is the 'confusion matrix'
+# 0,0 and 1,1 are the correct predictions
+# the 0,1 and 1,0 are the incorrect predictions
+table(well_a2$switch, well_a2$predicted)
+```
+
+The "true" values are in the `switch` column, and the predicted values are in the cleverly named `predicted` column. For our confusion matrix plot we need to facet by these two variables:
+
+
+```{r}
+ggplot(pred, aes(x = dist100, y = arsenic)) +
+   scale_y_continuous(trans = "log") +
+    geom_tile(aes(fill = .fitted)) +
+        stat_contour(aes(z = .fitted), colour = "black") +
+    geom_point(data = well_a2,
+               aes(colour = factor(switch == predicted,
+                                   labels = c("Incorrect", "Correct")),
+                   y = exp(log.arsenic.)),
+               alpha =  0.5) +
+    scale_color_manual(values = c("firebrick3", "green"),
+                       name = "Model Performance") +
+    facet_grid(switch ~ predicted)
+```
+
+
+## Regular Expressions
+
+Some sample strings:
+
+```{r}
+library(stringr)
+counties = c("Adams", "Asotin", "Benton", "Chelan", "Clallam", "Clark",
+"Columbia", "Cowlitz", "Douglas", "Ferry", "Franklin", "Garfield",
+"Grant", "Grays Harbor", "Island", "Jefferson", "King", "Kitsap",
+"Kittitas", "Klickitat", "Lewis", "Lincoln", "Mason", "Okanogan",
+"Pacific", "Pend Oreille", "Pierce", "San Juan", "Skagit", "Skamania",
+"Snohomish", "Spokane", "Stevens", "Thurston", "Wahkiakum", "Walla Walla",
+"Whatcom", "Whitman", "Yakima")
+```
+
+`str_detect` returns true or false based on whether it finds the pattern in each string.
+
+```{r}
+# which counties have a lowercase 'a'?
+str_detect(counties, pattern = "a")
+
+# the logical vector isn't super useful, instead let's 
+# subset the vector by the matches
+counties[str_detect(counties, pattern = "a")]
+
+# counties that have an 'a' followed by an 's' 
+counties[str_detect(counties, pattern = "as")]
+
+# a really long pattern (case matters!):
+counties[str_detect(counties, pattern = "Skagi")]
+```
+
+`str_replace` is the *find/replace* command. Note that I am **not** assigning the results so as to leave the original vector intact. 
+
+```{r}
+# replace 'a' with space ' '
+str_replace(counties, pattern = "a", replacement = " ")
+
+# str_replace only replaces the *first* instance per string
+# to get them all, use str_replace_all
+str_replace_all(counties, pattern = "a", replacement = " ")
+
+str_replace(counties, pattern = "fer", replacement = " FER was here ")
+
+# replace all spaces with nothing (delete spaces)
+str_replace_all(counties, pattern = " ", replacement = "")
+```
+
+Special characters! There are lots of special characters, [this cheatsheet](http://www.cheatography.com/davechild/cheat-sheets/regular-expressions/) is helpful.
+
+```{r}
+# '^' is the start of the string
+# '^A' will match strings that start with 'A'
+counties[str_detect(counties, pattern = "^A")]
+
+# '$' is the end of the string
+# 's$' matches strings that end with s
+counties[str_detect(counties, pattern = "s$")]
+
+# '.' matches any single character
+counties[str_detect(counties, pattern = "o.o")]
+
+# First four characters:
+str_extract(counties, pattern = "^....")
+
+# You can use quantifier in curly braces
+# (this is the same as the line above)
+str_extract(counties, pattern = "^.{4}")
+
+# and of course we can mix and match,
+# any 4 characters followed by an n in the 5th position
+str_extract(counties, pattern = "^.{4}n")
+```
+
+Escaping special characters: what if you actually want to match a period?
+In regex, all of the special characters have special meaning. If you want to match them, you need to *escape* them with **two** backslashes:
+
+```{r}
+# replaces all characters with nothing (probably not what you want)
+str_replace_all(names(well_a), pattern = ".", "")
+
+# replaces periods with nothing (works because we escaped the period)
+str_replace_all(names(well_a), pattern = "\\.", "")
+
+# Quotes can also be escaped
+x = "Escaping \"quotes\" inside a \'string\' works with a single backslash."
+y = "backslashes \\ must also be escaped"
+z = "Use the cat command to see what's \"really there\""
+
+print(x)
+print(y)
+print(z)
+cat(x)
+cat(y)
+cat(z)
+
+# you can also alternate single and double quotes
+# but this can only go one level deep:
+a = "This string has 'quotes' in it."
+b = 'This string has "double quotes" in it.'
+```
+
+"Just keep adding adding backslashes until it works"
+
+
+## For loops
+
+
+See the new For Loop Discussion Forum!
