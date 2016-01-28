@@ -7,6 +7,13 @@ output: ioslides_presentation
 
 ## Tonight:
 
+```{r, include = FALSE}
+packages = c("ggplot2", "dplyr", "broom", "tidyr", 
+             "reshape2", "fortunes")
+lapply(packages, library, character.only = TRUE)
+```
+
+
 - Pivots: wide-to-long and long-to-wide
     - `tidyr` and `reshape2`
 - Full on data munging
@@ -16,7 +23,10 @@ output: ioslides_presentation
 
 ## Tools
 
-R everything we do tonight can be done many different ways, in base R or using any number of packages. Instead of focusing on that, I'm highlighting a small number of relatively new, well-maintained packages that have helped me get these jobs done easily and efficiently.
+R everything we do tonight can be done many different ways, in base R or using any number of packages.
+
+
+Instead of focusing on that, I'm highlighting a small number of relatively new, well-maintained packages that have helped me get these jobs done easily and efficiently.
 
 # Wide-to-long, long-to-wide
 
@@ -56,16 +66,15 @@ spread(reentry, key = months, value = percent)[1:6, 1:6]
 - Data should be stored in columns, not in column names
 - All values that measure the same thing should be in the same column
 
-TODO link to Tidy Data paper
+The ideas behind tidy data have been around for a long time, but this exact term was coined by Hadley Wickham, of course. He has a [Tidy Data Paper](http://www.jstatsoft.org/v59/i10) that is a good (quick) read - especially practical for those without much SQL/data warehousing experience.
 
-Data that follows Tidy Data principles is easy to manipulate and query, easy to 
-plot (with ggplot, at least), and easy to use in a model.
+Data that follows Tidy Data principles is easy to manipulate, easy to query, easy to 
+plot (at least with ggplot), and easy to use in a model.
 
 ---
 
-```{r, eval = FALSE}
-# TODO eval truee
-fortunes::fortune("tidy data")
+```{r}
+fortunes::fortune("messy data")
 ```
 
 ## `reshape2`
@@ -77,7 +86,8 @@ fortunes::fortune("tidy data")
 ```{r}
 library(reshape2)
 re2 = read.csv("reentry.csv")
-re2 = melt(re2, id.vars = "X", variable.name = "months", value.name = "percent")
+re2 = melt(re2, id.vars = "X",
+           variable.name = "months", value.name = "percent")
 #     consistent Hadley syntax: function names use _ for word separation,
 #     arguments use . for word separation
 identical(reentry, re2)
@@ -112,10 +122,6 @@ ggplot(reentry, aes(x = months, y = percent, color = county)) +
 ```
 
 We'll clean it up even more.
-
-## Casting
-
-TODO: add or cut.
 
 # Data manipulation with `dplyr`
 
@@ -154,13 +160,13 @@ In everyday use, when exploring or analyzing a specific data set, the NSE versio
 
 ## The Pipe
 
-TODO insert pipe image
+![yes a pipe](magrittrpipe.jpg)
 
 All of these simple verbs are nice for doing simple things one step at a time. What makes `dplyr` really shine is the pipe operator, `%>%`, borrowed from the `magrittr` package.
 
 The pipe does something very simple - it takes the result of whatever is on the left and *pipes* it to the function on the right as the first argument.
 
-## Simple piping
+## Simple piping {.smaller}
 
 ```{r}
 library(dplyr)
@@ -168,7 +174,19 @@ library(dplyr)
 mtcars %>% head(2)
 ```
 
-The above uses are illustrative, but pointless in practice.
+The above uses are illustrative. These first two example are fairly pointless in practice (`mean(1:5)` is easier to read and understand than `1:5 %>% mean`. 
+
+
+## Lots of pipes
+
+```{r}
+rexp(100) %>% 
+    log(base = 2) %>% 
+    sd %>% 
+    round(2)
+```
+
+This is more approachable than `round(sd(log(rexp(100), base = 2)), 2)`, yet still more concise than doing everything one at-a-time.
 
 ## Lots of pipes {.smaller}
 
@@ -216,6 +234,7 @@ Piping is especially useful chaining `dplyr` verbs together. Every verb expects 
     - make a `ggplot` for each group
     - fit a model to each group
     - write each group to its own CSV
+- `summarize_each` and `mutate_each` work on multiple columns at once
 - One of the biggest features: `dplyr` can connect to a SQL database on the back-end, *translate dplyr code to SQL code*, and execute it for you.
 
 ---
@@ -231,10 +250,7 @@ mtcars %>%
     coef                        
 ```
 
-
-## `broom` tidy models
-
-TODO picture of model with broom?
+# `broom:` tidy models
 
 ## Three ways to sweep up
 
