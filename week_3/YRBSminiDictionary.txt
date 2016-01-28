@@ -1,0 +1,46 @@
+
+Data Dictionary for the files 'obese11.csv' and 'sex11.csv'
+===========================================================
+
+Dataset source: 2011 National Youth Risk Behavior Survey (YRBS), 
+United States Center for Disease Control and Prevention
+(http://www.cdc.gov/HealthyYouth/yrbs/data/index.htm)
+
+Converted from columnar ASCII to R using code by Anthony Joseph Damico, available on GitHub.
+Margins verified as correct, vs. the CDC's User's Manual document.
+
+Original dataset has 15425 records and 207 features.
+In each of the two sub-datasets, some records were deleted for missingness on critical features.
+There are still missing values on features deemed non-critical.
+
+Joint Data Dictionary:
+----------------------
+All features are coded 0/1 indicating "yes/no" responses to the descriptions, unless otherwise noted
+
+id (integer) - row # in the original dataset
+age (integer, 12 to 18) - respondent's age in years. The two extreme values appear in the questionnaire as "12 of younger" and "18 or older".
+
+female - self-explanatory
+demog (character) - Census-based demographic groups, reduced to 6 groups ("Hispanic" and "Multiple Hispanic" combined to "Latino", missing values rolled into "Other or Unknown").
+
+active5 - has been engaged in rigorous activity for at least 60 minutes a day, at least 5 out of the past 7 days.
+active0 - has been engaged in rigorous activity for at least 60 minutes a day, NOT even once out of the past 7 days.
+screen3 - has been watching TV at least 3 hours per day, or engaged in non-school computer use at least 3 hours per day, in the past 7 days.
+image - sees oneself as "slightly overweight" or "obese" (1 if either is true, 0 if none).
+breakfast - had breakfast in the morning in past 7 days.
+sleep8 - has at least 8 hours' sleep per night on average, on school nights.
+schoolTalk - has spoken to a teacher or other school personnel about a *personal* problem, at least once in past 12 months.
+smoke20 - smoked at least one cigarette, on at least 20 of past 30 days.
+frveg5 - eats at least 5 fruit and vegetable servings (combined) per day.
+veg3 - eats at least 3 vegetable servings per day.
+overwt - weight between 85th and 95th percentile, according to the CDC's official age/gender/height calculations
+obese - weight over 95th percentile, according to the CDC's official age/gender/height calculations
+
+ovwtobese - either 'overwt' or 'obese' is 1.
+alcoSchool10 - had alcohol on school property, on at least 10 out of the past 30 days.
+fight10 - was engaged in physical fights, at least 10 times in the past 12 months.
+forcedSex - has ever been forced to have sex.
+hopeless - has felt at least once in past 12 months, so sad and hopeless for 2 weeks in a row, that had to stop some usual activities.
+sex3 (integer) - how many sexual partner respondent has had over the past 3 months (6 indicates "6 or more").
+
+
