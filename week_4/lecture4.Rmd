@@ -272,7 +272,13 @@ The most concerning outliers---and the most noticeable, usually---are in the res
 
 The diagonals of the **hat matrix**, $H = X(X'X)^{-1}X'$ are called the leverages. They depend *only on X*, but high leverages indicate that the point *could* have a strong effect on the regression.
 
-A data point is influential when it has both a high leverage and a big residual. **Cook's Distance** or **Cook's D** is a nice overall measurement of how much a single observation effects the overall fit. You can calculate Cook's D for every point in a `glm` or `lm` with  `cooks.distance()`. Automatically calculated by `broom::augment`.
+The leverages for each point are included as the `.hat` values after you use `broom::augmemt()` on a model.
+
+## Cook's D
+
+A data point is *influential* when it has both a high leverage and a big residual.
+
+**Cook's Distance** or **Cook's D** is a nice overall measurement of how much a single observation effects the overall fit. You can calculate Cook's D for every point in a `glm` or `lm` with  `cooks.distance()`. They are included ny `broom::augment` as `.cooksd`.
 
 A rough rule of thumb is to worry about points if their Cook's D value is greater than $4 / n$. A less rough rule of thumb sets the threshold at $4 / (n - k - 1)$.
 
