@@ -1,0 +1,220 @@
+---
+title: 'Lab 4: Robust Regression'
+author: "Gregor Thomas"
+date: "Monday, February 1, 2016"
+output:
+  ioslides_presentation:
+    incremental: no
+    fig_height: 3.5
+    fig_width: 5
+  slidy_presentation:
+    fig_height: 3.5
+    fig_width: 5
+    highlights: pygments
+    incremental: no
+    theme: cosmo
+---
+
+## CRAN Task Views
+
+```{r, echo = FALSE, include=FALSE}
+packages = c("ggplot2", "MASS", "arm", "quantreg", "reshape2",
+             "wesanderson", "broom", "gridExtra", "dplyr", "hett")
+lapply(packages, library, character.only = T)
+theme_set(theme_bw(10))
+```
+
+When you want to try something new in R and you're looking for resources, the [CRAN Task Views](http://cran.r-project.org/web/views/) can be a good place to start.
+
+The **Robust** task view offers short descriptions of many applicable packages.
+
+Tonight we'll use `MASS:rlm` (robust linear model), and `quantreg::rq` (quantile regression).
+
+## Looking back: distributions and definitions
+
+OLS, ordinary least-squares, is all about averages, or *expected values*.
+
+- we predict the expected value of $y$ for given $X$
+- the coefficient of a single x is the average change in y for a unit change in x
+
+It's a happy coincidence that the computationally easy problem of minimizing the sum of the squared error corresponds to the maximum likelihood estimate for $E(y)$ *when we assume a Gaussian distribution of errors*.
+
+## Sensitivity to Outliers
+
+But we know averages are relatively sensitive to outliers. We can see that in action (really, in estimation) when we **square** the error, which gives large errors a big effect.
+
+Two common ways to make regression models "robust" to outliers are to address these two issues:
+
+- *quantile regression*, where we predict, e.g., the median instead of the mean
+- *M-estimators*, where we change the *loss function* that is **m**inimized
+
+We will do a little theory on the latter, but demonstrate both.
+
+## Four loss functions:
+
+```{r, echo = FALSE}
+# borrowed from John Fox's code for his
+# Appendix on Robust Regression
+# http://cran.r-project.org/doc/contrib/Fox-Companion/robust-regression.txt
+biwt.rho <- function(e, k=4.685){
+    ifelse (abs(e) <= k,
+            ((k^2)/6)*(1 - (1 - (e/k)^2)^3),
+            (k^2)/6)
+}
+
+huber.rho <- function(e, k=1.345){
+    ifelse (abs(e) <= k, 0.5*e^2, k*abs(e) - 0.5*k^2)
+}
+```
+
+```{r, include = FALSE}
+n = 200
+losses = data.frame(SD = seq(-5.5, 5.5, length = n)) %>%
+    mutate(`absolute value` = abs(SD),
+           square = SD^2,
+           Huber = huber.rho(SD, 1),
+           `Tukey's Bisquare` = biwt.rho(SD)) %>%
+    melt(id = "SD")
+
+pal = 6
+loss1 = ggplot(losses, aes(x = SD, y = value, color = variable)) +
+    geom_line(size = 1) +
+    labs(colour = "Loss function",
+         x = "Error (in Std Deviations)") +
+    scale_colour_brewer(type = "qual", palette = pal)
+loss2 = loss1 + 
+    coord_fixed(xlim = c(-5.2, 5.2), ylim = c(0, 5.2)) +
+    scale_colour_brewer(type = "qual", palette = pal, guide = F)
+```
+
+---
+
+```{r, warning = FALSE, fig.width=8, fig.height=5}
+grid.arrange(loss1, loss2, ncol = 2)
+```
+
+I include the left plot to emphasize how quickly $x^2$ gets big as $x$ gets away from 0.
+
+- Absolute value loss is almost never used in practice. (A discontinuous derivative is trouble for optimization routines.)
+- Huber's loss function is similar to absolute, but smoothes out the sharp corner.
+- Tukey's bi-square function is similar to Huber/Absolute up to a point, but it flattens out and at some number of standard deviations away from the mean (typically `k = 4.685`).
+
+## Efficiency
+
+Statisticians talk about the efficiency of estimators, by which they mean *how efficiently they use the information in the data*. OLS is provably the most efficient estimator of the normal MLE, so it is considered 100% efficient. Robust estimators can lose efficiency, but the default values of $k$ for the Huber and Tukey loss functions are chosen so that, asymptotically, they have 95% efficiency.
+
+Internally, these loss functions are transformed and applied as weights to the data points in the regression.
+
+If your data has measurement error recorded for each point, i.e., you have data on the individual errors, using the inverse measurement error as a weight is standard practice. In this case, you can just use the `weights` argument of `lm`.
+
+# Examples
+
+## Phone data
+
+This is classic data for robust regression. It's in the `MASS` package, but as a list rather than a data.frame.
+
+```{r}
+phones = as.data.frame(phones)
+ggplot(phones, aes(x = year, y = calls)) + geom_point() + 
+    labs(title = "Can you spot the outliers?")
+```
+
+## `MASS::rlm`
+
+A really nice feature of `rlm` is that it returns a regular `lm` object, with three extra pieces: `s`, the robust scale estimate, `w`, the weights, and `psi` ($\psi$) the loss function used.
+
+By default, `rlm` uses `method = "M"`. It works well for outliers in the response, but can still be senstitive to outliers in $X$. With `method = "MM"`, a more careful estimation is done, adding steps to better estimate the variance. For large `n`, the `"MM"` method can be slow.
+
+---
+
+```{r}
+mod.lm = lm(calls ~ year, data = phones)
+mod.tuk = rlm(calls ~ year, data = phones, method = "MM")
+# MM uses Tukey's bisquare
+mod.hub = rlm(calls ~ year, data = phones, method = "M", maxit = 500)
+# this failed to converge without upping the max iterations
+```
+
+---
+
+```{r}
+display(mod.lm)
+```
+
+---
+
+```{r}
+summary(mod.tuk)
+```
+
+---
+
+```{r}
+summary(mod.hub)
+```
+
+---
+
+```{r}
+mod_list = list(LM = mod.lm, Tukey = mod.tuk, Huber = mod.hub)
+phones_aug = lapply(mod_list, augment) %>%
+    bind_rows(.id = "model")
+```
+
+---
+
+```{r}
+ggplot(phones_aug, aes(x = year, y = calls))+ 
+    geom_point() +
+    geom_line(aes(y = .fitted, color = model), size = 1.2) +
+    scale_color_manual(values = wes_palette(
+        "Moonrise2", n = 3, type = "discrete"
+    ), breaks = c("LM", "Huber", "Tukey")
+    )
+```
+
+---
+
+```{r}
+library(quantreg)
+mod.quant = rq(calls ~ year, data = phones)
+
+phones_aug =
+    augment(mod.quant) %>%
+    mutate(model = "Quantile") %>%
+    bind_rows(phones_aug)
+```
+
+
+---
+
+```{r}
+ggplot(phones_aug, aes(x = year, y = calls))+ 
+    geom_point() +
+    geom_line(aes(y = .fitted, color = model), size = 1.2) +
+    scale_color_manual(values = wes_palette(
+        "Moonrise2", n = 4, type = "discrete"
+    ),
+    breaks = c("LM", "Huber", "Tukey", "Quantile")
+    )
+```
+
+## Additional resources:
+
+I've lightly covered much of what's in John Fox's [Appendix on Robust Regression](http://cran.r-project.org/doc/contrib/Fox-Companion/appendix-robust-regression.pdf), but if you want more details on what was covered tonight, it's a good and short read.
+
+For a longer (but still not a full book), more theoretical coverage, Bellio and Ventura's [An Introduction to Robust Estimation with R Functions](http://www.dst.unive.it/rsr/BelVenTutorial.pdf) is very readable.
+
+For quantile regression, the `quantreg` package has a [very nice vignette](http://cran.r-project.org/web/packages/quantreg/vignettes/rq.pdf).
+
+## Appendix: `tlm`
+
+```{r}
+library(hett)
+mod.tdist = tlm(calls ~ year, data = phones)
+# no predict method :(
+# we'll have to matrix multiply to get predictions:
+phones$tdist.pred = cbind(1, phones$year) %*% coef(mod.tdist$loc.fit)
+```
+
+
