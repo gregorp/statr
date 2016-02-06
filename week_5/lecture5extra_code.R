@@ -1,7 +1,16 @@
 # Step-wise regression on mtcars
 
 library(MASS)
-mod.full = lm(mpg ~ (disp + qsec + wt + cyl)^2, data = mtcars)
+library(dplyr)
+
+mt = mtcars %>%
+    mutate(
+        cyl = factor(cyl),
+        gear = factor(gear),
+        carb = factor(carb)
+    )
+
+mod.full = lm(mpg ~ (disp + qsec + wt + cyl)^2, data = mt)
 # inside a model formula, squaring added
 # terms means "include two-way interactions"
 # You can cube for 3-way interactions, etc.
@@ -13,14 +22,14 @@ mod.back = stepAIC(object = mod.full, direction = "backward")
 
 # To go forward, we can start with a simple model,
 # this is an intercept-only model
-mod.null = lm(mpg ~ 1, data = mtcars)
+mod.null = lm(mpg ~ 1, data = mt)
 # We also need to specify the "scope"---how far do we want to (possibly) go?
 mod.for = stepAIC(object = mod.null, scope = ~ (disp + qsec + wt + cyl)^2,
                   direction = "forward")
 
 # Notice that our forward and backward models are different.
 AIC(mod.for, mod.back)
-# Though in terms of AIC, they are indistinguishable
+# Though in terms of AIC, they are very close
 
 # We could also try a "both" direction
 mod.both.full = stepAIC(object = mod.full, scope = ~ (disp + qsec + wt + cyl)^2,
