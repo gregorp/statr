@@ -1,0 +1,237 @@
+---
+title: "StatR 502 HW 3 Key"
+author: Scott Rinnnan and Gregor Thomas
+date: Thursday, Jan 29, 2015
+output:
+  pdf_document:
+    fig_height: 3
+    fig_width: 5
+    toc: yes
+  html_document:
+    toc: yes
+---
+
+```{r, results='hide', warning=FALSE, error=FALSE, message=FALSE}
+library(xlsx)
+library(magrittr)
+library(reshape2)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(MASS)
+library(arm)
+library(boot)
+setwd("~/Dropbox/STATR 201/Week 3")
+```
+
+## Problem 1: Webscraping
+
+**(a)**
+We start by standardizing the county names to match the xlsx files:
+```{r, tidy=TRUE}
+counties = c("Adams", "Asotin", "Benton", "Chelan", "Clallam", "Clark", "Columbia", "Cowlitz", "Douglas", "Ferry", "Franklin", "Garfield", "Grant", "Grays Harbor", "Island", "Jefferson", "King", "Kitsap", "Kittitas", "Klickitat", "Lewis", "Lincoln", "Mason", "Okanogan", "Pacific", "Pend Oreille", "Pierce", "San Juan", "Skagit", "Skamania", "Snohomish", "Spokane", "Stevens", "Thurston", "Wahkiakum", "Walla Walla", "Whatcom", "Whitman", "Yakima")
+
+counties<-tolower(counties)
+counties<-gsub(" ", "", counties)
+cts<-substr(counties,1,4)
+head(cts)
+```
+
+**(b)** 
+
+Create the urls by appending the county strings to the base url:
+```{r}
+base.url <- "http://www.ofm.wa.gov/sac/cjdatabook/"
+
+urls<-NULL
+for(i in 1:length(cts)){
+  urls[i]<-paste0(base.url,cts[i],".xlsx")
+}
+head(urls)
+```
+
+**(c)**
+
+I created the folder manually, but it can also be created using the `dir.create()` function. We can now download the files into that directory:
+```{r,eval=FALSE}
+for(i in 1:length(urls)){
+  download.file(urls[i],destfile=paste0("Counties/",cts[i],".xlsx"))
+}
+```
+You should now see the county xlsx files downloaded in your specified directory.
+
+**(d)**
+
+Pulling out the crime data: 
+```{r}
+getCrime<-function(File){
+  read.xlsx(File,
+            sheetIndex = 1,
+            rowIndex = 18:26,
+            header = T,
+            colClasses = "character",
+            stringsAsFactors = FALSE)
+}
+```
+
+**(e)**
+
+Creating a list in which to store the crime data:
+```{r}
+ctyfiles<-list.files("Counties",pattern=".xlsx",full.names=T)
+crime.dat<-list()
+for(i in 1:length(ctyfiles)){
+  crime.dat[[i]]<-getCrime(ctyfiles[i])
+}
+```
+
+**(f)**
+
+Combining the data:
+```{r}
+crime<-do.call(rbind,crime.dat)
+head(crime)
+```
+
+**(g)**
+
+I picked the first twelve counties for simplicity, but you are of course welcome to choose them however you like:
+```{r,fig.height=5,fig.width=7}
+crimesub<-crime[1:96,]
+crimesub %<>% subset(Calendar.Year=="Murder")
+crimesub$County<-counties[1:12]
+crimesub %<>% 
+  melt(id = c("Calendar.Year","County"), variable.name = "year", value.name = "count") %>%
+  mutate(crimesub = factor(Calendar.Year),
+         year = as.numeric(str_replace(year, "X", "")))
+
+p<-ggplot(crimesub, aes(x = year, y = count)) 
+p + geom_line() + 
+  facet_wrap(~ County) +
+  scale_x_continuous("Year",breaks=c(1995,2005)) + 
+  ylab("Number of murders")
+```
+
+## Problem 2: Obesity data
+
+**(a)**
+
+Reading in and cleaning up the obesity data:
+```{r}
+obese<-read.csv("obese11.csv",colClasses="factor")
+obese<-obese[,-1] #let's remove id column, since we really don't need it
+obese$age %<>% as.integer
+obese %<>% na.omit
+```
+
+Let's start by making a model with all the variables considered:
+```{r}
+mod1<-glm(obese~.,family=binomial,data=obese)
+summary(mod1)
+```
+
+Looks like a lot of the variables aren't contributing that much. After futzing around for a bit, here's a better one I found:
+```{r,tidy=TRUE}
+mod2<-glm(obese ~ female + demog + active5 + screen3 + image + sleep8 + frveg5, family = binomial, data = obese)
+summary(mod2)
+AIC(mod1,mod2)
+```
+Despite the jump in AIC, I don't think it makes much sense to include overweight as a predictor of obesity, since they are mutually exclusive. 
+
+Including an interaction term, we can do even better:
+```{r,tidy=TRUE}
+mod3<-glm(obese ~ female*demog + active5 + screen3 + image + sleep8 + frveg5, family = binomial(link = "logit"), data = obese)
+summary(mod3)
+AIC(mod2,mod3)
+```
+
+We can make a ladder plot of our model:
+```{r,tidy=TRUE,fig.height=6}
+mod3coef <- data.frame(var = names(coef(mod3)), est = coef(mod3), se = se.coef(mod3)) #arm::se.coef
+mod3coef$var %<>% reorder(mod3coef$est)
+p <- ggplot(mod3coef, aes(x = est, y = var))
+p + geom_errorbarh(aes(xmin = est - 2 * se, xmax = est + 2 * se),
+height = 0.2, color = "gray60") + geom_vline(xintercept = 0, color = "dodgerblue4") + 
+geom_point()
+```
+
+**(b)**
+
+The addition of interaction effects allows a different line to be fit to each demographic, each with its own slope. Since we see major differences between the demographics (see lecture), this seems like a pretty reasonable thing to do. Based on AIC values, we would expect model 3 to have better predictive accuracy than model 2.
+
+## G&H #3:
+
+This is really just an algebra problem. Given two point, find the formula for the line that connects them. Putting the two points into our equation, we have: \begin{align*}
+\mbox{logit}(.27) & = a + b\cdot 0\\
+\mbox{logit}(.88) & = a + b\cdot 6.
+\end{align*}
+
+Solving the first equation for $a$, we get $a = \mbox{logit}(.27) \approx -1.$ Putting that into the second equation, we get $b = (\mbox{logit}(.88)+1)/6 \approx 0.5.$ Hence, our model is $\mbox{logit}(p) = -1 + 0.5x,$ where $x$ is income in units of \$10,000.
+
+## G&H #5:
+
+**(a)**
+
+Let's start by taking a look at the plot:
+```{r,fig.width=6,fig.height=4}
+curve(inv.logit(-24+.4*x),from=0,to=100,lwd=2,
+      xlab="Midterm score",ylab="Probability of passing") #boot::inv.logit()
+```
+
+As you can see from the graph, the higher a student's score on the midterm, the higher the probability that they will pass the class. We would like to simulate some data that fits this model. We are told that the scores or normally distributed with $\mu = 60$, $\sigma = 15$. We will begin by sampling 50 test scores from this distribution. (I will set a seed so that my results are reproducible.)
+
+```{r}
+set.seed(100)
+scores<-rnorm(50,60,15)
+hist(scores,prob=T)
+curve(dnorm(x,60,15),add=T,col=2,lwd=2)
+```
+
+So we see that the simulated scores indeed fit the distribution. Now we can take those simulated test scores and calculate the students' probability of passing the class:
+```{r}
+pscores<-inv.logit(-24+.4*scores)
+```
+
+These numbers give us the probability that a student will pass, but in actuality, each student really only has one of two outcomes: they either pass or they don't. One way we can assign a pass or fail to each student is to just randomly sample from `c(0,1)` with probability weights that reflect each student's probability of passing:
+```{r}
+results<-NULL
+for(i in 1:50){
+  results[i]<-sample(0:1,1,prob=c(1-pscores[i],pscores[i]))
+}
+```
+
+Or, much more succinctly:
+```{r}
+results<-rbinom(50,1,pscores)
+```
+
+
+
+Now we can finally add these results to our model fit:
+```{r,fig.width=6,fig.height=4}
+curve(inv.logit(-24+.4*x),from=0,to=100,lwd=2,
+      xlab="Midterm score",ylab="Probability of passing")
+points(scores,results,bg="#FF000050",pch=21)
+```
+
+**(b)**
+
+The logistic regression should not change under standardization of the data. The probability of passing will be the same regardless of whether a student's score has been transformed or if it's the original raw score.
+```{r}
+zscores<-(scores-mean(scores)/sd(scores))
+mod1<-glm(results~scores,family=binomial)
+mod2<-glm(results~zscores,family=binomial)
+summary(mod1)
+summary(mod2)
+```
+
+**(c)**
+
+Adding some noise:
+```{r}
+newpred<-rnorm(50,0,1)
+mod3<-glm(results~scores+newpred,family=binomial)
+summary(mod3)
+```
+
+We observe no change in the amount of null deviance, because the new predictor only adds noise to the model, and not any meaningful new information. There is a small amount of decrease in the residual deviance.

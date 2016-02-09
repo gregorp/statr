@@ -1,0 +1,203 @@
+---
+title: "StatR 502 HW 4 Key"
+author: Scott Rinnnan and Gregor Thomas
+date: Thursday, Feb 5, 2015
+output:
+  pdf_document:
+    fig_height: 3
+    fig_width: 5
+    toc: yes
+  html_document:
+    toc: yes
+---
+
+```{r, results='hide', warning=FALSE, error=FALSE, message=FALSE}
+library(faraway)
+library(arm)
+library(ggplot2)
+library(magrittr)
+library(hett)
+library(metRology)
+setwd("~/Dropbox/STATR 201/Week 4/")
+```
+
+## Problem 1: Offsets and complaints
+
+**(a)**
+Let's look at the ratio of complaints per visit.
+```{r}
+data(esdcomp)
+
+with(esdcomp,mean(complaints/visits))
+with(esdcomp,max(complaints/visits))
+```
+
+Indeed, quite low. Even the maximum is only a little more than twice as much as the mean.
+
+**(b)**
+
+Fitting the model:
+```{r}
+mod1<-glm(complaints~residency+gender+revenue+hours+offset(log(visits)),
+          data=esdcomp,family=poisson)
+summary(mod1)
+```
+
+**(c)**
+
+```{r}
+drop1(mod1)
+```
+
+It looks like a marginal decrease in AIC can be accomplished by excluding the revenue variable. Probably not justifiable, though, given a decrease in AIC of less than 2.
+
+```{r}
+add1(mod1,scope=~(residency+gender+revenue+hours)^2)
+```
+
+It would appear that adding the interaction term `residency:hours` gives us a better model. Let's add it and try again:
+
+```{r}
+mod2<-glm(complaints~residency+gender+revenue+hours+offset(log(visits))+residency:hours,
+          data=esdcomp,family=poisson)
+add1(mod2,scope=~(residency+gender+revenue+hours)^2)
+```
+
+Again, it looks like adding `revenue:hours` gives us a slightly better model fit. The final model:
+```{r}
+mod3<-glm(complaints~residency+gender+revenue+hours+offset(log(visits))+
+            residency:hours+revenue:hours,
+          data=esdcomp,family=poisson)
+summary(mod3)
+AIC(mod1,mod3)
+```
+
+Finally, a quick note for future work: it is important to understand how we are determining which variables to include or exclude from the model, but iterating the `add1` and `drop1` functions can be tedious and time-consuming. This whole process can be accomplished in one go by using the `stepAIC` function, which can fit the best model by adding and subtracting components:
+
+```{r}
+stepAIC(mod1,scope=~(residency+gender+revenue+hours)^2)
+```
+
+Keep in mind that this ONLY judges which model is best based on AIC. Other methods should also be considered. Fitting models is an art, not an algorithm!
+
+**(d)**
+
+Quasi-Poisson model:
+```{r}
+mod4<-glm(complaints~residency+gender+revenue+hours+offset(log(visits))+
+            residency:hours+revenue:hours,
+          data=esdcomp,family=quasipoisson)
+summary(mod4)
+```
+
+The dispersion parameter is only 1.2. Probably not different enough from 1 to justify adding an extra parameter to our model. 
+
+**(e)**
+
+Ladder plots:
+```{r,fig.height=4}
+poiscoef<-data.frame(var = names(coef(mod3)), est = coef(mod3), se = se.coef(mod3)) #arm::se.coef
+poiscoef$var %<>% reorder(poiscoef$est)
+p <- ggplot(poiscoef, aes(x = est, y = var))
+p + geom_errorbarh(aes(xmin = est - 2 * se, xmax = est + 2 * se), height = 0.1, color = "gray60") + 
+  geom_vline(xintercept = 0, color = "dodgerblue4") +
+  geom_point()
+
+qpoiscoef<-data.frame(var = names(coef(mod4)), est = coef(mod4), se = se.coef(mod4))
+qpoiscoef$var %<>% reorder(qpoiscoef$est)
+p <- ggplot(qpoiscoef, aes(x = est, y = var))
+p + geom_errorbarh(aes(xmin = est - 2 * se, xmax = est + 2 * se), height = 0.1, color = "gray60") + 
+  geom_vline(xintercept = 0, color = "dodgerblue4") +
+  geom_point()
+```
+
+The relatively small differences in the ladder plots confirm there is little difference between fitting a Poisson model and a quasi-Poisson model.
+
+## Problem 2: Abalone 
+
+**(a)**
+
+Read in the data, and do some initial exploration:
+```{r,fig.height=5,cache=TRUE}
+abalone<-read.csv("abaloneTrain.csv")
+head(abalone)
+pairs(abalone,pch=".",lower.panel = NULL)
+```
+
+We can see right away that several of our variables our heavily correlated. We can use this information to inform our model selection. It probably won't make a lot of sense, for example, to include both length and width in a model, since the second variable doesn't offer much new information, given the first.
+
+```{r}
+ggplot(abalone,aes(x=height,y=rings,colour=sex,size=allweight))+
+  geom_point() +
+  facet_grid(~sex)
+```
+
+We can also see there are a couple of data points that we will probably want to consider outliers.
+
+**(b)**
+
+The full linear model:
+```{r,fig.height=5}
+mod1<-lm(rings~.,data=abalone)
+summary(mod1)
+boxplot(hatvalues(mod1))
+plot(mod1,which=4)
+```
+
+As we can see, observation 1217 has substantially more leverage than the other points. If our point is to come up with an equation to predict the number of rings an abalone shell will have based on its other characteristics, then it is probably a good idea to ignore this outlier and refit the model.
+
+```{r,fig.height=5}
+mod2<-lm(rings~sex+width+height+allweight+meatweight+gutweight+shellweight,
+         data=abalone[-1217,])
+summary(mod2)
+plot(mod2,which=5)
+```
+
+One could persuasively argue that observation 2922 should be left out of the model as well. That exercise is left up to you! 
+
+## G&H #6:
+
+**(a)**
+
+```{r}
+dat<-read.table("congress.txt")
+mod1<-lm(dem_prop_88~.,data=dat)
+summary(mod1)
+```
+
+A model using all of the provided variables explains an astonishing 97% of the variance in the data! Unsurprisingly, voter constituency, incumbency of the candidate, and previoues election results are all good predictors of the outcome of a current election. In this case, a voter's district doesn't seem to matter so much.
+
+**(b)**
+
+We note that there do seem to be some outliers in the dataset, and intuitively, I think it makes sense that some elections just wouldn't follow the trends, and would more be a function of specific political events or candidates. With this dataset in particular, we see that some of the proportions for votes in 1986 were either entirely Democratic or entirely Republican. This is probably because those were the only candidates in that particular election. In this case, that leads to fatter tails in the distribution of residuals than we would expect to see if they were normally distributed.
+
+```{r,fig.height=5}
+plot(mod1,which=5)
+ggplot(dat,aes(x=dem_prop_86,y=dem_prop_88,colour=as.factor(incumbent)))+geom_point()
+hist(mod1$residuals,prob=T)
+curve(dnorm(x,mean(mod1$residuals),sd(mod1$residuals)),add=T,lwd=2,col=2)
+```
+
+In order to minimize the effects of data outliers, we turn to robust regression. We will fit a _t_ distribution to our model, i.e., we assume that the error follows a _t_ distribution, i.e., fatter tails:
+
+```{r}
+mod2<-tlm(dem_prop_88~.,data=dat)
+summary(mod2)
+```
+
+We can see that the _t_ distribution does a bit better job accommodating the tails of our error.
+```{r,fig.height=5}
+hist(mod2$loc.fit$residuals,prob=T)
+curve(dt.scaled(x,3,mean(mod2$loc.fit$residuals),sd(mod2$loc.fit$residuals)),
+      add=T,col=2,lwd=2)  #metRology::dt.scaled
+curve(dnorm(x,mean(mod2$loc.fit$residuals),sd(mod2$loc.fit$residuals)),add=T,col=3,lwd=2)
+legend("topright",legend=c("t fit","normal fit"),col=2:3,lwd=2,bty="n")
+```
+
+**(c)**
+
+Which model you prefer is really a matter of personal preference. I generally like simplicity in models, so unless the outliers are really causing problems, I would tend toward a simple linear model.
+
+**(d)**
+
+I think it makes a lot more sense to consider incumbency as a factor. This will fit a separate line for each incumbency category.
