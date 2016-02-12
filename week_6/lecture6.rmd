@@ -1,0 +1,437 @@
+---
+title: 'Lecture 6: Smooth!'
+subtitle: 'Loess, Splines, and GAM'
+author: "Gregor Thomas"
+date: "Thursday, February 11, 2016"
+output:
+  ioslides_presentation:
+    fig_height: 3.5
+    fig_width: 5
+
+---
+
+## Announcements
+
+- Final Projects
+    - Next quarter
+    - Proposals due soon!
+    
+```{r, echo = FALSE, include=FALSE}
+packages = c("ggplot2", "arm", "gridExtra", "fortunes", "mgcv", 
+             "dplyr", "magrittr")
+lapply(packages, library, character.only = T)
+theme_set(theme_bw(8))
+```
+
+## Tonight's Menu
+
+- Quick correction
+- Smoothing methods
+    - loess
+    - splines
+- GAMs
+    - quick example
+    - in-depth example
+    - wrap-up
+
+# Smoothing
+
+## Smoothing functions
+
+There are many methods of fitting a smooth function to data. We'll mention two tonight:
+
+- loess (only briefly), because it's relatively common and you should know what it is, 
+- splines, because they're also common and we'll use them in GAMs.
+
+They are most commonly used with a single predictor - if we have more to smooth then we'll use a GAM.
+
+## Loess
+
+- **Loess**, for "**LO**cal regr**ESS**ion" (at least according to Wikipedia---which cites another John Fox appendix, [Non-parametric Regression](http://cran.r-project.org/doc/contrib/Fox-Companion/appendix-nonparametric-regression.pdf))
+- Fits a local polynomial to data.
+- Looks at points close to `x` and weights them (heavily) based on how close to `x` they are.
+
+In R, we use `stats::loess`, generally specifying the `span` values, sometimes specifying the `degree` of the polynomial used (default is degree 2). Details are in `?loess`,
+but lower `span` means more *wiggliness* (technical term).
+
+## Tuning Loess
+
+The `span` is the proportion of data that is included at any point
+     - Higher span -> more data at all points -> less wiggly
+     - Regardless of span, data is still weighted
+     
+For a non-parametric smoothers, it's often hard to say how much smoothing is appropriate. Often people adjust by hand and evaluate graphically until it "looks right".
+
+## Loess in action
+
+I got this gif from the [simplystatistics blog](http://simplystatistics.org/2014/02/13/loess-explained-in-a-gif/) (via R-bloggers):
+
+![loess](loess.gif)
+
+
+## Loess examples {.smaller}
+
+```{r}
+discov = data.frame(discoveries = as.numeric(discoveries), year = 1860:1959)
+disc.plot = ggplot(discov, aes(x = year, y = discoveries)) +
+    geom_line(color = "dodgerblue4")
+disc.plot
+```
+
+----
+
+Of course we can use `ggplot`,
+
+```{r}
+disc.plot +
+    geom_smooth(method = "loess", color = "firebrick3", fill = NA)
+```
+
+but let's learn how to get there.
+
+
+## The loess function 
+
+We fit a `loess` like any other model, and extract predictions the same way as well.
+
+```{r, fig.width = 3, fig.height = 2.25}
+disc.lo = loess(discoveries ~ year, data = discov)
+discov$pred = predict(disc.lo)
+disc.plot %+% discov + geom_line(aes(y = pred), size = 1)
+```
+
+Experiment with different `span` and `degree` settings for `loess`.
+
+## Different spans
+
+```{r, fig.show = 'hide'}
+for (sp in c(0.1, 0.25, 0.5, 0.75, 1)) {
+    disc.lo = loess(discoveries ~ year, data = discov, span = sp)
+    discov$pred = predict(disc.lo)
+    print(disc.plot %+% discov + geom_line(aes(y = pred), size = 1) +
+        labs(title = paste("Span = ", sp)))
+}
+```
+
+## What does a loess object look like? {.smaller}
+
+```{r}
+disc.lo = loess(discoveries ~ year, data = discov, span = 0.25)
+summary(disc.lo)
+```
+
+## Splines {.smaller}
+
+Normal polynomials can be used in regression, but they often have issues at the edges. Even low-degree polynomials like $x^2$ blow up **fast** when you get away from the center.
+
+Splines address this issue by using polynomials *piece-wise*. When there is a spline fit, we define **knots** in the data where the pieces meet---usually evenly spaced by value or by quantile. Between two knots, we fit a polynomial function, but it has no influence outside of its interval.
+
+## Splines {.smaller}
+
+At the knots, we can require the piece-wise polynomials on either side to share a value to make the spline **continuous**. We can even make the *derivatives* of the polynomials share the same value at the knots to make the spline **smooth**. There are many options for the *basis*, the exact polynomial functions that are used, but we won't go into details. Cubic splines are quite common.
+
+## Fitting a spline
+
+I like the `mgcv` package. We smooth a vector with `s()`, and pick a basis with the `bs` argument:
+
+```{r, fig.height = 2.75}
+disc.spl = gam(discoveries ~ s(year, bs = "cr"), data = discov)
+# "cr" stands for cubic regression, that is cubic splines.
+discov$pred = predict(disc.spl)
+disc.plot %+% discov + geom_line(aes(y = pred), size = 1)
+```
+
+## Splines vs. Loess {.smaller}
+
+- Loess only:
+    - Intuitive / easy to understand (?)
+
+- Loess and Splines:
+    - Non-parametric
+    - Not succinct (though Loess is worse if you actually want an *equation*)
+    - Generate smooth curves, as wiggly as you want
+
+- Spline only:
+    - Efficient algorithm even for large `n`
+    - Well-accepted methods for automatic tuning
+    - Generalizes to more dimensions
+
+Both splines and loess are built in to ggplot. If you use `geom_smooth` and don't specify a method `loess` will be used if there are fewer than 1000 points, otherwise splines will be used (via a `gam` function) for efficiency.
+
+Both can be *very* nice for prediction.
+
+
+# GAM
+
+## Linear Models and Extensions {.build}
+
+$$
+\begin{aligned}
+\mathrm{LM}  &\quad y &\sim \beta_0 + \beta_1 x_{1} + \beta_2 x_{2} + \ldots + \epsilon \\
+\mathrm{GLM} &\quad g(y) &\sim \beta_0 + \beta_1 x_1 + \beta_2 x_2 + \ldots  + \epsilon \\
+\mathrm{GAM} &\quad y &\sim f_1(x_1) + f_2(x_2) + \ldots + \epsilon
+\end{aligned}
+$$
+
+## Fitting a GAM
+
+Well, we already fit a GAM with a single predictor. It's basically the same. Using the `trees` data from last week:
+
+```{r}
+g1 = gam(Volume ~ s(Girth) + s(Height), data = trees)
+```
+
+## Output {.smaller}
+
+```{r}
+summary(g1)
+```
+
+## Plot to see the smooths {.smaller}
+
+```{r, fig.width = 6, fig.height = 3}
+par(mfrow = c(1, 2))
+plot(g1)
+```
+
+Girth looks not straight... maybe quadratic? Height looks linear, we could probably get rid of the smooth term. (Not all terms *need* smoothing... categorical variables can't be smoothed.)
+
+## Simplifying {.smaller}
+
+```{r}
+g2 = gam(Volume ~ s(Girth) + Height, data = trees)
+summary(g2)
+```
+
+## Comparing: g1 {.smaller}
+
+```{r, results = "hide", fig.width = 6, fig.height = 5}
+gam.check(g1)
+```
+
+## Comparing: g2 {.smaller}
+
+```{r, results = "hide", fig.width = 6, fig.height = 5}
+gam.check(g2)
+```
+
+# My Big Fat GAM Example
+
+## Brain data
+
+Brain imaging data from the `gamair` package. This example is taken pretty directly from Simon Wood's excellent book *Generalized Additive Models: An Introduction with R*.
+
+```{r}
+data("brain", package = "gamair")
+```
+
+## A look at the data
+
+```{r}
+bplot1 = ggplot(brain, aes(x = Y, y = X, fill = medFPQ)) +
+    geom_tile() +
+    scale_fill_gradient2(midpoint = 2) +
+    coord_equal() +
+    theme(panel.background = element_rect(fill = "gray20"),
+          panel.grid = element_blank())
+```
+
+## A look at the data
+
+```{r, echo = FALSE}
+print(bplot1)
+```
+
+
+## Data inspection {.smaller}
+
+There's a couple outliers:
+
+```{r}
+plot(log(brain$medFPQ))
+```
+
+Probably not *super* influential (especially on the untransformed scale), but we'll get rid of them.
+
+## Overaggressively throwing out data:
+
+```{r}
+arrange(brain, medFPQ) %>% head
+brain = filter(brain, medFPQ > 1e-5)
+```
+
+## GAM time! {.smaller}
+
+```{r}
+m0 = gam(medFPQ ~ s(X, Y, k = 100), data = brain)
+```
+
+From the help at `?mgcv::choose.k`:
+
+> When setting up models in the mgcv package, using `s` or `te` terms in a model formula, `k` must be chosen: the defaults are essentially arbitrary.
+
+> In practice `k-1` (or `k`) sets the upper limit on the degrees of freedom associated with an `s` smooth (1 degree of freedom is usually lost to the identifiability constraint on the smooth).
+
+Didn't do this for `trees`... oops.
+
+## Check the model {.smaller}
+
+```{r, resuts = "hide", fig.height = 4.5, fig.width = 6}
+gam.check(m0)
+```
+
+What does that residual pattern mean?
+
+## Examine trend in residuals
+
+```{r}
+m0_resid = resid(m0)
+m0_fitted = predict(m0)
+display(lm(log(m0_resid^2) ~ log(m0_fitted)))
+```
+
+This tells me that the *variance* of the error (residual) is increasing with the *square* of the expected (fitted) value - because the coefficient of `log(residual)` is about 2.
+
+## Use a GLM
+
+This calls for a `glm` from the Gamma family. (If the coefficient was 0, no glm needed. If the coefficient was 1, Poisson glm. If the coefficient was 2 and it was count data, Negative Binomial.)
+
+We could also try a 4th root transformation of the response:
+
+```{r}
+m1 = gam(medFPQ ^ .25 ~ s(Y, X, k = 100), data = brain)
+m2 = gam(medFPQ ~ s(Y, X, k = 100), data = brain, 
+         family = Gamma(link = "log"))
+```
+
+The log link will make sure predicted values are positive.
+
+## Check the 4th root model {.smaller}
+
+```{r, results = "hide", fig.height = 4.5, fig.width = 6}
+gam.check(m1)
+```
+
+## Check the Gamma model {.smaller}
+
+```{r, results = "hide", fig.height = 4.5, fig.width = 6}
+gam.check(m2)
+```
+
+## They both look good!
+
+So let's compare accuracy on the original scale:
+
+```{r}
+m1_resid = brain$medFPQ - predict(m1) ^ 4
+m2_resid = brain$medFPQ - predict(m2, type = "response")
+mean(m1_resid^2)
+mean(m2_resid^2)
+```
+
+No contest, `m2` is better.
+
+## Simpler model? {.smaller}
+
+We could try smoothing each variable separately:
+
+```{r}
+m3 = gam(medFPQ ~ s(Y, k = 30) + s(X, k = 30), data = brain, 
+         family = Gamma(link = "log"))
+anova(m3, m2, test = "F")
+```
+
+Note that the degrees of freedom aren't integers anymore. They're approximated because many parameters are fit, but there are strict restraints on them so they're not independent. Also, the models are only somewhat nested.
+
+## Predictions:
+
+```{r, fig.height = 4.5, fig.width = 6}
+brain$m2 = predict(m2, type = "response")
+bplot2 = ggplot(brain, aes(x = Y, y = X, fill = m2)) +
+    geom_tile() +
+    coord_equal() +
+    stat_contour(aes(z = m2), color = "gray50") +
+    scale_fill_gradient2(midpoint = 2) +
+    theme(panel.background = element_rect(fill = "gray20"),
+          panel.grid = element_blank()) +
+    labs(title = "Modeled")
+```
+
+## Predictions
+
+```{r, echo = FALSE}
+gridExtra::grid.arrange(bplot1 + labs(title = "Raw"),
+                        bplot2, ncol = 2)
+```
+
+## Missing Details:
+
+- How do we choose knot locations?
+    - The `gcv` in `mgcv` stands for "generalized cross-validation" - `mgcv` has a pretty good method for automatically finding good knot locations
+    
+- Can I use `loess` instead of spline smooths?
+    - Yes, but only in the `gam` package, not the `mgcv` package
+    
+- AIC/BIC can be used, but should be treated as approximated
+    - BIC's extra penalty may be a little harsh on GAMs
+
+## More GAM resources {.smaller}
+
+I've tried to show the power of GAMs tonight. They can be very useful in data exploration, suggesting transformations, and in prediction.
+
+I suppose I've shown you "enough to get yourself in trouble". I would *not* advise going to intensely-GAM without doing some more reading.
+
+- *ISLR* Book has a GAM chapter
+- *Elements of Statistical Learning* (also free online) has a GAM chapter
+- *Generalized Additive Models* by Simon Wood is excellent
+- You'll do more GAM next quarter, focusing on prediction
+
+For all smoothing methods **beware of extrapolation**. Don't trust smoothed fits beyond the range of the data.
+
+# More Pros and Cons
+
+## Recommendations for GAMs {.smaller}
+
+(Mostly from *Extending the Linear Model with R*, Faraway 2006.)
+
+- Only relative values of smooth functions matter. Add a constant to one and take it out of the other and the overall fit is the same.
+
+- Plot fits of individual smooths on the same y-axis, and the functions that take up more of the axis have more influence.
+
+- Degrees of freedom used are **approximate**, and may not even by whole numbers!
+
+- Predictor p-values (e.g. in model summaries) "*are only approximate at best, and should be treated with some skepticism*". 
+- ANOVA with an F-test performs fairly well for model comparison, e.g., `anova(gam1, gam2, test = "F")`.
+
+Extrapolation of predictions outside of the sample range is *higly unreliable*.
+
+
+## Pros and Cons of GAMs (from ISLR p. 285-86)
+
+**Pros:**
+
+- Automatically model non-linear relationships - no experimenting with different transformations.
+
+- Non-linear fits can make more accurate predictions
+
+- We can still examine the effect of each predictor on the response, so still useful for inference
+
+**Cons:** 
+
+- Model still is additive. Interactions must be added manually.
+
+----
+
+To that pros/cons list, I would add/summarize
+
+**Pros:**
+
+- Flexibility
+- Less subjective judgment required
+
+**Cons:**
+
+- Less efficient estimators - requires more data
+- Slower to fit - requires more processing time
+- Difficult to interpret - no equation, often just a picture as output
+- Inference is more complicated
