@@ -1,0 +1,132 @@
+---
+title: 'Lab 7'
+subtitle: 'Three Ways to Use Other Packages in Your Package'
+author: "Gregor Thomas"
+date: "Monday, February 22, 2016"
+output: ioslides_presentation
+---
+
+## The DESCRIPTION file
+
+When you use another package in your package, it must go in the `DESCRIPTION` file of your package. There are two possibilities: 
+
+1. In the `Depends` field.
+    - This used to be the only way (until R 2.14) but is now *advised against*
+    - Packages in `depends` will be automatically loaded for the end-user whenever they load your package.
+2. In the `Imports` field.
+    - This is now the *preferred method*.
+    - Packages in `Imports` can be referenced in the `NAMESPACE` file (created by your Roxygen comments) to make them available internally.
+    
+The **biggest effect** of having packages in the `Imports` field of of `DESCRIPTION` is that **will be installed (by default) when your package is installed**.
+
+## Suggests: The odd one out
+
+The only packages that should go in Imports or Depends are ones that are *needed* by functions in your package. Functions that are used only in examples (or only in your vignette!) can go in `Suggests`.
+
+- `Suggests` packages will not be installed by default. (See `?install.packages`)
+
+**Packages should be as lightweight as possible.** Requiring more packages than you really need makes your package more difficult to maintatin and asks more of the end-user to install.
+
+## In summary
+
+- Packages used *in your functions* need to be in either `Imports` or `Depends`
+    - Preferably in `Imports` (unless you are *confident* that the user of your package also wants to use your dependencies)
+    - Functions from *imported* packages will need further care in the `NAMESPACE` file, which will be handled by your Roxygen comments
+- Packages only used in your vignette(s) (or only in examples) can be relegated to `Suggests`.
+    - *Reminder:* packages used in your vignette will need to be loaded in your vignette (with `library()`) just like in any other `.Rmd` file.
+    
+## `devtools` to the rescue
+
+```{r, eval = FALSE}
+create("demo3")
+setwd("demo3")
+use_package("ggplot2")
+use_package("dplyr", type = "Suggests")
+```
+
+## Omitted details
+
+You can depend on specific package versions, and there are a few other less common types listings for packages. Not to mention versioning and licensing for your package... things that shouldn't really matter for your final projects.
+
+See the [DESCRIPTION page](http://r-pkgs.had.co.nz/description.html) from Hadley's Package book for details.
+
+# Using functions from Imported packages
+
+## Options for Imports {.smaller}
+
+There are 3 ways to use functions from imported packages
+
+- Generally: Use `package::function` in your code. Like `car::boxCox`, `stats::mean`, `mgcv::gam`...
+- If you use a single function a lot, import it specifically
+     - `#' @importFrom magrittr \`%>%\` `
+     - Then you can freely use that function inside your code
+- If you use lots of functions from a package, import the whole thing:
+     - `#' @import ggplot2`
+     
+When importing with Roxygen, it's good practice to put the import or importFrom statements in front of every function that uses them. That's the best way to keep track of your dependencies as your package evolves.
+
+More reading: the [NAMESPACE Chapter](http://r-pkgs.had.co.nz/namespace.html#namespace) in Hadley's package book.
+
+# Programming vs Scripting
+
+## Different goals, different tools
+
+Scripts we've written together have been single purpose:
+
+- do a specific thing to a specific data set
+- operate on a specific model
+- make a simulation for a particular experiment...
+
+Generally, this is appropriate! In a package, however, the goal is usually to have code generalize.
+
+## Functions should be self-contained
+
+- A function *can* access variables that are not passed in.
+    - Generally, any objects a function needs **should be passed in as arguments**
+- A function *can* modify or create objects in the global environment
+    - Functions *should not* have "side-effects" - they should `return()` any and all outputs (return a `list()` for multiple outputs).
+
+## Standard evaluation
+
+Under *standard evalution*, all function arguments have to be objects known to your workspace. This can include
+
+- objects you've defined (see `ls()`)
+- functions or objects from loaded packages
+- newly defined unnamed objects, e.g., numbers `2:5` and strings `"identity"`
+
+Unquoted column names (like in `ggplot2::aes()` or `dplyr` functions) non-standard!
+
+## NSE
+
+Non-standard evaluation is very convenient for users, but much more difficult to implement!
+
+We will not cover non-standard evaluation, but if you want to learn more the `lazyeval` package and its vignettes are the best. (`dplyr` relies heavily on `lazyeval`)
+
+Hadley's NSE functions all have standard-evaluating counterparts with an underscore `_` appended to the name. The NSE functions do a little bit of clean-up work and then call the standard version.
+
+## ggplot example
+
+The big NSE function from `ggplot2` is `aes`. It's standard counterpart is `aes_string()`. Where `aes()` expects unquoted column names, `aes_string` expects strings.
+
+```{r}
+library(ggplot2)
+g = ggplot(mtcars,
+           aes_string(x = "wt", y = "mpg",
+                      color = "as.factor(cyl)")) +
+    geom_point()
+```
+
+## dplyr example
+
+```{r, include = F}
+library(dplyr)
+```
+
+
+```{r}
+filter_(mtcars, "cyl == 4", "mpg > 30")
+```
+
+Notice how much is quoted - `dplyr` can be more difficult to use in programming. There are more advanced methods demonstrated in [the nonstandard-evaluation vignette](https://cran.r-project.org/web/packages/dplyr/vignettes/nse.html)
+
+
