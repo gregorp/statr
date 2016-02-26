@@ -1,0 +1,374 @@
+---
+title: 'Lecture 8:'
+subtitle: 'Intro to Multilevel Models'
+author: "Gregor Thomas"
+date: "Thursday, February 25, 2016"
+output:
+  ioslides_presentation:
+    fig_height: 4
+    fig_width: 6
+---
+
+## Announcements
+
+- Monday's lab: Bootstrapping with mixed models
+- Next Thursday's class: More mixed models!
+- Homework: this week's homework is combined with next week's homework. **Do** get started, **don't** neglect your final projects!
+
+```{r, echo = FALSE, include=FALSE}
+packages = c("ggplot2", "arm", "gridExtra",
+             "dplyr", "lme4")
+lapply(packages, library, character.only = T)
+theme_set(theme_bw())
+```
+
+## Tonight's Menu
+
+- Focused review
+- Motivating mixed models
+- Introductory example
+- Technical details
+- Simulated example
+
+We have 2 labs and another full lecture on mixed effects---the goal for tonight is a strong understanding of the *simplest* case.
+
+## Focused Review: Factor Coefficients {.smaller}
+
+Recall fitting a model with factor terms:
+
+- The first level of the factor is the *reference level*.
+    - How should you pick the reference level?
+        - The most common level (generally) should be the reference
+    - Which R commands can help you change the levels of a factor?
+        - `relevel` lets you set just the reference level
+        - `reorder` lets you order all the levels by another variable(s)
+        - `levels()` can be assigned to change things entirely
+- Coefficients of the non-reference levels can be thought of as "adjustments" to the model fit for those levels
+    - If the parameter is just the factor (or interactions with another factor), then it's a slope adjustment
+    - If the parameter is interacted with a continuous variable, then it's a slope adjustment (with respect to that continuous variable)
+    - *Warning:* this is the default case (and what I generally recommend), but it's possible to get other "contrasts", see `?contr.treatment` for details.
+
+## Diamonds example
+
+```{r}
+diam = mutate(diamonds,
+              cut = factor(cut, ordered = F),
+              color = factor(color, ordered = F),
+              cut = relevel(cut, ref = "Ideal"),
+              color = relevel(color, ref = "G"))
+mod = lm(price ~ carat * cut + cut*color, data = diam)
+```
+
+- Carat is continuous
+- Cut is a factor with 5 levels
+- Color is a factor with 7 levels
+
+---
+
+```{r}
+round(coef(mod), 2)[c(1:8, 13:14)]
+```
+
+What are these coefficients?
+
+---
+
+```{r}
+coef(mod) %>% round(2) %>% tail(6)
+```
+
+And these?
+
+# Multilevel Modeling
+
+## Motivating Example {.smaller}
+
+Very simple data with repeated measures.
+
+```{r}
+Dyestuff %>% group_by(Batch) %>%
+    summarize(n.obs = n(), avg.Yield = mean(Yield),
+              sd.Yield = round(sd(Yield), 1))
+```
+
+This data was collected to investigate how batch-to-batch variation of an intermediate step in dye production is related to variation in the overall yield.
+
+## Examining the data
+
+```{r, fig.height = 3, fig.wdith = 4}
+ggplot(Dyestuff, aes(x = Batch, y = Yield)) +
+    geom_point()
+```
+
+## Let's reorder by mean yield
+
+```{r, fig.height = 3, fig.wdith = 4}
+Dyestuff = mutate(Dyestuff, Batch = reorder(Batch, X = Yield, FUN = mean))
+ggplot(Dyestuff, aes(x = Batch, y = Yield)) +
+    geom_point()
+```
+
+## What we already know {.smaller}
+
+What can we do with a linear model?
+
+```{r}
+fe <- lm(Yield ~ Batch, data = Dyestuff)
+arm::display(fe)
+```
+
+This model is okay, but rather boring. It treats every batch as completely different. It also doesn't help us much with the research question. 
+
+---
+
+With no continuous predictor, we're really just fitting an intercept for each batch, equal to its mean:
+
+```{r}
+Dyestuff %>% group_by(Batch) %>% 
+    summarize(mean.yield = mean(Yield)) %>%
+    mutate(lm.coef = coef(fe))
+```
+
+## Problems with the linear model {.build}
+
+ **Think about the analytic goal.**
+The batches are randomly sampled, meant to represent the general
+population of batches, so we don't care about the main effect of any single batch (the *fixed effects*).
+
+We want to make inferences about the "population of possible batches", and to understand that population distribution.
+
+This is a typical **classical** reason to use *random effects*. However, it's also a very **Bayesian** approach, we're getting our toes in the Bayesian door.
+
+## Example 1: My First Random Effect {.smaller}
+
+```{r}
+library(lme4)
+re  <- lmer(Yield ~ 1 + (1 | Batch), data = Dyestuff)
+display(re)
+```
+
+Our only fixed effect is an intercept (`~ 1`), the grand mean of the response. But then we "let the intercept vary" based on the batch (`1 | Batch`), but with distributional assumptions.
+
+## Example 1: Output {.smaller}
+
+```{echo = F}
+display(re)
+```
+
+In the output, the error terms show how much of the variance of the response can be attributed to the between-batch variance, and how much is left over (residual).
+
+Conceptually, Gelman & Hill refer to this as *partial pooling* of information.
+- *complete pooling* would be a Null model ignoring batch, `Yield ~ 1`
+- *no pooling* was our fixed effects model, `Yield ~ Batch`
+- *partial pooling* is the happy medium, providing a bit of shrinkage (like the Lasso)
+
+---
+
+Notice the reduction in the number of estimated coefficients: we're no longer using up a degree of freedom per level of the factor!
+
+However, it's actually difficult to say how many degrees of freedom we are using (much like with smoothing functions)... we estimate the fixed effects, we estimate the variance for the random effects, and post-hoc we can estimate the actual random effects themselves, but with constraints.
+
+# Some Technical Details
+
+## Formula syntax for random effects
+
+Random effects are specified in parentheses, with a pipe `|` separator: `(coefficient | category)`, where the `coefficient` indicates the parameter to be estimated with random effects, and the `category` is a factor over which the random effects take place. For example, if country was a category, nested with continent:
+
+```{r, eval = FALSE}
+y ~ x + (1 | country) # random intercepts by country
+y ~ x + (x | country) # random slopes (x coefficients) by country
+y ~ x + (1 + x | country) # random slopes and intercepts by country
+y ~ x + (1 | country) + (1 | continent)
+# random intercepts by both country and continent
+```
+
+## Terminology
+
+*Mixed models* with *random* & *fixed effects*, or *multilevel* / *hierarchical* models with *modeled* & *unmodeled* parameters, refer to the same thing (depending who you talk to).
+
+**Mixed models** has a longer history, and is perhaps more common.
+
+**Multilevel / hierarchical models** is becoming more common. It's more likely to be used when there are levels of nested factors (students within classrooms within schools within districts...), and also as a stepping stone into more explicitly Bayesian modeling.
+
+## Equations
+
+For a given $batch$ and $obs$ observation,
+
+this intercept-only linear model has equation
+$$
+\begin{aligned}
+    y_{batch,obs} &= \beta_{batch} + \epsilon_{batch, obs},\\
+    \epsilon_{batch, obs} &\sim \mathcal{N}(0, \sigma^2)
+\end{aligned}
+$$
+
+The random effects model has equation
+
+$$
+\begin{aligned}
+    y_{batch, obs} &= \beta_0 + b_{batch} + \epsilon_{batch, obs},\\
+    b_{batch} &\sim \mathcal{N}(0, \sigma_b^2),\\
+    \epsilon_{batch, obs}  &\sim \mathcal{N}(0, \sigma^2)
+\end{aligned}
+$$
+
+## Fitting mixed effects models---the packages {.smaller}
+
+There are two main R packages for mixed effects models: `nlme` and
+`lme4`. 
+
+We use `lme4` as it's syntax tends to be easier (and it was more-or-less intended to replace `nlme`). Douglas Bates had a large hand in developing both of them.
+He created `lme4` (*linear mixed effects* using *S4* classes)
+when he decided `nlme` needed re-writing.
+
+For a more math-heavy introduction to mixed methods (compared to Gelman & Hill), the `lme4` package has a nice vignette [Fitting linear mixed effects models using lme4](http://cran.r-project.org/web/packages/lme4/vignettes/lmer.pdf).
+
+One more classic references is Pinheiro & Bates (2000): *Mixed Effects Models in S and S-Plus*.
+
+## Computational Challenges {.smaller}
+
+Conceptually, mixed models are just another extension of ordinary linear models---a bit like GLM but a step in a slightly different direction.
+
+However, mixed effects models are **much** more difficult computationally.
+At every step of the fitting process, the random effects are "integrated out" so that the fixed effects can be estimated.
+
+For you, what's important is to appreciate that estimation for these models is much more complex and a bit more fragile. While extremely complicated LM and GLMs can be estimated all within R, as mixed models get complicated most people use MCMC methods as implemented in special purpose software such as BUGS, JAGS, ADMB, or Stan.
+
+All of these options have R packages to help interface with them and call them directly from R. The 2nd half of G&H provides lots of BUGS examples, though in the last few years Gelman's team developed **Stan**, which is what I prefer. All of the BUGS examples in G&H [have been duplicated in Stan](https://github.com/stan-dev/example-models/wiki/ARM-Models).
+
+## Extracting random effects {.smaller}
+
+Estimating individual coefficients for each random effect factor level is not part of the model fitting process, however based on the variance that we do estimate, we can get *conditional means* of each random effect 
+
+```{r}
+ranef(re)
+```
+
+The corresponding standard errors can be extracted with `arm::se.ranef`.
+
+## Comparing results
+
+ANOVA, AIC, etc. don't translate too well.
+Next time / in lab we'll cover some model comparisons, mostly using
+a parametric bootstrap.
+
+## Terminology {.smaller}
+
+These are terms used in experimental design. You should have a **passing familiarity** with them, but most of you probably don't need to worry about them too much.
+
+- *Balanced:* every level has equal number of observations.
+(Great in theory, difficult in reality.)
+
+- *Nested factors:* there is a hierarchical relationship between factors,
+e.g., schools within school districts, districts within states...
+
+- *Crossed factors:* opposite of nested---the factor levels are unrelated in the data, e.g., 2 treatments each tried at two locations, or race and gender.
+
+- Crossed factors are *completely crossed* if
+there is at least one observation for every combination; they are *partially crossed* if some combinations are missing. 
+
+- *Blocking:* is way of setting up crossed factors. In a randomized experiment, two treatments randomly might be assigned randomly, but *blocking* is a mechanism to ensure roughly even numbers of males and females are are assigned to the treatment and control groups.
+
+## Fitting: ML vs REML {.build}
+
+Maximum likelihood estimates, in unbalanced designs, can do
+embarrassing things like predict negative variances, and can be biased!
+
+REstricted Maximum Likelihood (REML) estimates gets around this, and is generally preferable for fitting (REML is the default in `lme4`).
+
+In balanced designs, ML and REML should be the same, but in unbalanced designs you should rely on REML.
+
+Unfortunately, REML changes the likelihood such that *comparing models* with different fixed effects is harder---model comparison works better with ML. This will be discussed more in lab and next week in class.
+
+# Questions
+
+## Example 2: Simulated data
+
+Let's do a similar example where we simulate the data to see exactly what's going on:
+
+```{r}
+# some simulation parameters
+set.seed(1)
+n.groups = 12
+n.obs.per.group = rpois(n = n.groups, lambda = 20)
+
+sd.group   = 1.5
+mean.group = 3
+intercept  = 4
+sd.resid   = 1
+```
+
+## Generating the data
+
+```{r}
+# random means
+x1 <- rep(rnorm(n.groups, mean.group, sd.group), n.obs.per.group) 
+# categories
+categs <- as.factor(rep(LETTERS[1:n.groups], n.obs.per.group))
+
+# response
+y1 <- intercept + x1 + rnorm(sum(n.obs.per.group), 0, sd.resid)
+
+(means <- tapply(y1, categs, mean))
+```
+
+---
+
+Plotting our data
+
+```{r}
+plot(y1 ~ categs)
+points(unique(categs), means, pch=16, col=2)
+```
+
+---
+
+```{r}
+mod.fixed <- lm(y1 ~ categs)
+display(mod.fixed)
+```
+
+---
+
+```{r}
+mod.random1 <- lmer(y1 ~  (1 | categs))
+display(mod.random1)
+```
+
+---
+
+```{r}
+mod.random1.sd  <- sqrt(VarCorr(mod.random1)$categs[1])
+fixef(mod.random1)
+```
+
+The fixed effect is estimating the sum of the intercept and the mean group effect.
+
+## The true distribution and observations
+
+```{r}
+curve(dnorm(x, 0, sd = sd.group), from = -4, to = 4,
+      ylim = c(0, 0.6), lwd = 1.5, main = "Truth and observations")
+points(x = means - mean(means), y = rep(0, length(means)), pch = 16)
+```
+
+## And the fitted distribution
+
+```{r, eval = FALSE}
+curve(dnorm(x, mean = mean(y1) - fixef(mod.random1),
+            sd = mod.random1.sd), add = T,
+      col = "dodgerblue3", lwd = 1.5)
+```
+
+```{r, echo=FALSE}
+curve(dnorm(x, 0, sd = sd.group), from = -4, to = 4,
+      ylim = c(0, 0.6), lwd = 1.5,
+      main = "Truth, observations, and fit")
+points(x = means - mean(means), y = rep(0, length(means)), pch = 16)
+curve(dnorm(x, mean = mean(y1) - fixef(mod.random1),
+            sd = mod.random1.sd), add = T, col = "dodgerblue3", lwd = 1.5)
+```
+
+# Questions
+
+# That's all for tonight!
