@@ -1,0 +1,454 @@
+---
+title: 'Lecture 9:'
+subtitle: 'Collinearity & More Mixed Modeling'
+author: "Gregor Thomas"
+date: "Thursday, March 3, 2016"
+output:
+  ioslides_presentation:
+    incremental: yes
+  beamer_presentation:
+    colortheme: dolphin
+    fig_height: 3
+    fig_width: 4
+    incremental: yes
+    theme: boadilla
+  slidy_presentation:
+    fig_height: 3.5
+    fig_width: 5
+    highlights: pygments
+    incremental: yes
+    theme: cosmo
+fontsize: 8pt
+---
+
+## Announcements
+
+- Monday's lab: wrapping up mixed models with prediction
+- Next Thursday, last class (!):
+    - The quarter in review
+    - Looking ahead
+- Last HW due next Thursday, March 10. 
+- Final projects due Wednesday, March 16. Early submissions welcome. **Don't procrastinate!**
+
+```{r, echo = FALSE, include=FALSE}
+packages = c("ggplot2", "arm", "gridExtra", "boot", "lattice",
+             "dplyr", "lme4", "magrittr", "car")
+lapply(packages, library, character.only = T)
+theme_set(theme_bw(12))
+```
+
+## Tonight's Menu
+
+- Leisurely review
+- Collinearity
+- Radon in-depth
+    - shrinkage
+    - random slopes
+- Hierarchical models and data
+
+## Leisurely Review {.smaller}
+
+- What is the solution for linear regression (the "beta hat waltz")?
+    - $\hat{\beta} = (X'X)^{-1}X'y$
+- What is the most important regression assumption?
+    - Validity: your question must be appropriate to your data.
+- The second most important regression assumption?
+    - The *form* of your model: linear combinations for LM...
+- AIC/BIC: which direction is better?
+    - Lower is better.
+- What's the difference between AIC and BIC?
+    - BIC penalizes extra parameters based on the log of the number of observations
+- Should you blindly trust in the results of stepwise regression? 
+    - **NO!** At best, stepwise regression is a starting point. 
+
+## {.smaller}
+
+- What is the difference between LM and GLM?
+    - GLM uses a *link function* and can change the assumption of the underlying distribution
+- What pattern in a residual plot makes you want to use a GLM with, e.g., a Poisson or Gamma link?
+    - *Funnel shape*. If the *variance* of the residuals increases with the fitted values, make a change.
+- How do you access a column name stored in a variable, e.g., `col = "mpg"`? (`mtcars$col` will not work)
+    - `mtcars[[col]]` or `mtcars[, col]`
+- In the model formula `y ~ x + (1 | group)`, how many parameters are estimated? What are the fixed and random effects? What about `y ~ x + (1 + x | group)`?
+    - In `y ~ x + (1 | group)` we estimate 3: intercept, slope (x coefficient), and a group-level variance for the intercept.
+    - In `y ~ x + (1 + x | group)` we estimate 4: intercept, slope (x coefficient), and group-level variances for both slope and intercept.
+
+## Stepwise Regression: {.smaller}
+
+> In the abalone regression HW, we ended up having a regression with lots of interactions that has the lowest AIC score and we decided that is the best model. In the real business world, I wonder should I choose just the simple regression without interactions as most of the time, people cannot understand interactions well or give business meaning to the interaction terms. This simple regression may have a slightly higher AIC but all the variables are well understood and efficiencies easy to explain.
+
+- This is a great case for **not blindly following stepwise regression**, or relying too heavily on any particular model metric. If your goal is *purely prediction*, it doesn't matter if you can't assign meaning to the parameters. Otherwise, you should be able to **understand and explain** everything in your model.
+
+    - That said, two-way interactions aren't *too* hard to understand, and sometimes greatly improve performance. It's really only when you get to higher order interactions that interpretability gets harder.
+
+- Related: How does a linear transformation of a predictor change the fit of a linear model, and why would you do it?
+
+    - The quality of fit will not be changed, but it can make the model easier to understand and interpret.
+
+# Collinearity
+    
+## An ideal situation {.smaller}
+
+```{r}
+set.seed(47)
+n = 70
+x1 = rnorm(n)
+x2 = rnorm(n)
+y1 = 5 + 3 * x1 + 2 * x2 + rnorm(n, sd = sqrt(12))
+# what's the expected VARIANCE of y?
+```
+
+Good to know:
+
+$$\mathrm{Var}(aX + bY) = a^2 \mathrm{Var}(X) + b^2 \mathrm{Var}(Y) + 2ab \mathrm{Cov}(X, Y)$$
+
+---
+
+```{r}
+var(y1)
+cor(x1, y1)
+cor(x2, y1)
+cor(x1, x2)
+```
+
+## Less than ideal...
+
+However, there's a problem if predictors are correlated with each other...
+
+```{r}
+x3 = x1 + rnorm(n, sd = 0.5)
+y2 = 5 + 3 * x1 + rnorm(n, sd = 4)
+cor(x1, y2)
+cor(x3, y2)
+cor(x1, x3)
+```
+
+## {.smaller}
+
+```{r}
+mod.uncor = lm(y1 ~ x1 + x2)
+mod.cor = lm(y2 ~ x1 + x3)
+display(mod.uncor)
+display(mod.cor)
+```
+
+## Collinearity in regression equations
+
+When $\mathbf{X}$ is near-*degenerate*, it is known as <b>collinear.</b> This is a common problem, or fact of life, in many applications.
+
+The impact upon regression estimates is that <font color='red'>$\hat{\beta}$'s standard-error estimates increase.</font> This is because the SEs are 
+
+$$\sqrt{\mathrm{diag}\left\{\left(\mathbf{X}^T\mathbf{X}\right)^{-1}\hat{\sigma^2}\right\}},$$
+
+where $\hat{\sigma^2}$ is the estimate of the error variance. 
+
+When $\mathbf{X}$ is near-degenerate (one column is close to being a linear function of another column(s)), so is $\mathbf{X}^T\mathbf{X}$. A near-degenerate square matrix will have a very small determinant while its inverse will have a large diagonal.
+
+## In English
+
+<font color='blue'>In conceptual lay terms (which might be more insightful here), the model becomes "confused" when faced with two (or more) very similar "explanations" for the observations, and the inflated SEs reflect that.</font>
+
+
+## The Variance Inflation Factor (VIF)
+
+A diagnostic quantifying the potential collinearity "damage" from each covariate (say, covariate $\mathbf{X}_j$) is <font color='red'><b>the Variance Inflation Factor:</b></font>
+
+$$ VIF_j=\left(1-R^2_j\right)^{-1},$$
+
+where $R^2_j$ is the $R^2$ obtained by regressing $\mathbf{X}_j$ (as the outcome) on all other covariates.
+
+Indeed, $VIF_j$ is roughly the square of the factor by which everyone's standard errors get inflated, due to the addition of covariate $\mathbf{X}_j$ to the model. 
+
+Another way to look at it: $1-R^2_j$ is the proportion of $\mathbf{X}_j$'s variance that might contain *new* information.
+
+## Rules of thumb for VIF
+
+Some textbooks recommend setting a threshold value, so that covariates with VIF above it should be excluded (Montgomery et al. say 5 is a good threshold, Kutner says 10). 
+
+This might be useful, <font color='red'>but every hard threshold should be taken with a grain of salt and used judiciously.</font> **Context is everything.** <font color = 'red'>This is true for any exclusion/selection criterion, including AIC, even p-values.</font>
+
+## AIC / BIC Rule of Thumb review
+
+- What is the recommended cut-off for an AIC or BIC difference to be indistinguishable from 0?
+    - Differences < 2 are considered insignificant
+- What is the recommended threshold for an AIC or BIC difference to be considered "strong evidence"?
+    - Differences > 10 are considered "strong evidence".
+
+## VIF in R {.smaller}
+
+The `car` package provides a `vif` function.
+
+```{r}
+library(car)
+vif(mod.uncor)
+vif(mod.cor)
+```
+
+I've heard both 5 and 10 proposed as thresholds for VIF to be considered "high". 
+As with most of these thresholds, take it as a guide, not a law.
+
+Also note that collinearity isn't a problem restricted to two variables. Looking at pairwise correlations can catch bivariate collinearity, but you can imagine `x6` depending on `x1`, `x2`, and `x5`... they'll each be somewhat correlated with `x6`, but you need a technique like VIF to measure the extent of the problem.
+
+Some amount collinearity is unavoidable.
+
+## What to do about collinearity?
+
+If you've identified collinearity between two variables, the easiest thing to do is **pick one**. Either use what makes the most sense (domain knowledge!), or re-fit the model trying them out individually, and keep the best performer.
+
+The consequences of ignoring collinearity are
+
+- larger standard errors (both for the coefficients estimates and the residual error), and
+- near-random apportioning of the true effect between the collinear variables (in extreme cases).
+
+This matters most when you **care** about the collinear variables. If they're unimportant <font color='blue'>to your Question</font>, leaving them be isn't the worst thing.
+
+
+# Mixed Models
+
+## More Mixed Models
+
+One of the main benefits of random effects is a *shrinkage* method. 
+
+- Remember: Why is shrinkage a good thing?
+
+## Radon shrinkage {.smaller}
+
+```{r, echo = FALSE, include=FALSE}
+load("radon.RData")
+
+pool <- lm(y ~ x, data = radon)
+no.pool <- lm(y ~ x + county - 1, data = radon)
+
+display(no.pool) # arm gives us display(), a concise model summary
+display(pool)
+
+# Small sample counties won't have a enough measurements for 
+# "regression to the mean" to take effect -- they'll tend
+# to have more extreme coefficient estimates.
+
+# We'll plot this by extracting the coefficient estimates
+# from the no.pool model and plot them by the number of
+# observations in the county.
+
+# Use coef() to extract the coefficients and
+# arm::se.coef() to extract their standard errors
+est <- coef(no.pool)[-1]    # the first coefficient is for x
+err <- se.coef(no.pool)[-1] # we only want the county coefficients
+n <- as.numeric(table(radon$county))
+
+np.summ <- cbind.data.frame(n, est, err)
+
+fe.plot <- ggplot(np.summ, aes(x = n, y = est)) +
+    geom_pointrange(aes(ymin = est - err, ymax = est + err),
+                    position = position_jitter(w = 0.4),
+                    alpha = 0.5) +
+    scale_y_continuous(limits = c(-1, 3.5)) +
+    labs(y = "County intercept",
+         title = "No Pooling (fixed effects)",
+         x = "Observations in County")
+
+# A mixed effects model can be thought of as "partial pooling",
+# we'll allow the intercept to vary by county, but by imposing
+# that the intercepts be normally distributed they can't be
+# too far away unless there is enough data to support it.
+partial.pool <- lmer(y ~ x + (1 | county), data = radon)
+re <- ranef(partial.pool)$county$`(Intercept)`
+mean(re) # the mean is 0. We could add back in the intercept mean,
+         # or just use the coef
+pp.coef <- coef(partial.pool)$county$`(Intercept)`
+se <- se.ranef(partial.pool) # se.ranef, another nice function from arm
+
+re.summ <- data.frame(n = n,
+                      est = pp.coef,
+                      err = se$county)
+
+re.plot <- fe.plot %+% re.summ +
+    labs(title = "Partial Pooling (mixed effects)")
+
+grid.arrange(fe.plot, re.plot, ncol = 2)
+# In the partial pooling, the small counties "borrow" information
+# from the large ones and aren't able to pull the coefficient
+# estimates out to such extreme values. The high-n county
+# estimates are nearly identical
+
+# This shrinkage is readily apparent if we zoom in
+# on the small-n counties.
+grid.arrange(fe.plot + scale_x_continuous(limits = c(0, 15)),
+             re.plot + scale_x_continuous(limits = c(0, 15)),
+             ncol = 2)
+
+
+mods <- list(no.pool, pool, partial.pool)
+mod.names <- c("np",  "cp", "pp")
+names(mods) <- mod.names
+
+fort <- plyr::llply(mods, .fun = fortify, radon)
+names(fort) <- mod.names
+
+
+intercepts <- data.frame(county = 1:85,
+                         np = coef(mods[["np"]])[-1],
+                         cp = coef(mods[["cp"]])[1],
+                         pp = coef(mods[["pp"]])$county[, 1])
+int_molten <- reshape2::melt(intercepts, id.vars = "county",
+                   variable.name = "model",
+                   value.name = "intercept")
+slopes = data.frame(county = 1:85,
+                    np = coef(mods[["np"]])[1],
+                    cp = coef(mods[["cp"]])[2],
+                    pp = coef(mods[["pp"]])$county[, 2])
+slopes_molten <- reshape2::melt(slopes, id.vars = "county",
+                   variable.name = "model",
+                   value.name = "slope")
+fits <- left_join(int_molten, slopes_molten)
+
+
+set.seed(47)
+linesize <- 1
+focus <- c(66, 74)
+p2 <- ggplot(filter(radon, county %in% focus), aes(x = x, y = y)) +
+    geom_abline(data = filter(fits, county %in% focus),
+                mapping = aes(slope = slope, intercept = intercept,
+                              group = model, color = model,
+                              linetype = model),
+                size = linesize) +
+    scale_linetype_manual(values = c(1, 2, 1)) +
+    geom_point(size = 2.5) +
+    facet_wrap(~ county)
+p2
+```
+
+This is covered well in the book, but let's discuss and make sure all is clear.
+
+```{r, fig.width=8, echo = FALSE}
+grid.arrange(fe.plot, re.plot, ncol = 2)
+```
+
+---
+
+```{r, fig.width = 8, echo = FALSE, warning=FALSE}
+grid.arrange(fe.plot + scale_x_continuous(limits = c(0, 15)),
+             re.plot + scale_x_continuous(limits = c(0, 15)),
+             ncol = 2)
+```
+
+Zooming in on the small counties, the effect is obvious
+
+## In equations
+
+We could write this model several ways, e.g.,
+
+$$
+y_i = \alpha_{j[i]} + X_i\beta + \epsilon_i
+$$
+where
+$$
+\epsilon_i \sim \mathcal{N}(0, \sigma^2_y), \quad
+\alpha_j \sim \mathcal{N}(\beta_0, \sigma^2_\alpha)
+$$
+
+## As correlated errors
+
+This is equivalent to a regression with correlated errors:
+
+$$
+y_i = X_i\beta + \epsilon_i^\mathrm{all}, \quad
+\epsilon_i^\mathrm{all} \sim \mathcal{N}(0, \Sigma),
+$$
+
+Where
+$$
+\begin{aligned}
+\text{For a single obs}: &\quad
+\Sigma_{ii} = \mathrm{var}(\epsilon_i^\mathrm{all}) = \sigma^2_y + \sigma^2_\alpha \\
+\text{For 2 obs in the same group}: &\quad
+\Sigma_{ik} = \mathrm{var}(\epsilon_i^\mathrm{all}, \epsilon_k^\mathrm{all}) = \sigma^2_\alpha \\
+\text{For 2 obs in different groups}: &\quad \Sigma_{ik} = \mathrm{var}(\epsilon_i^\mathrm{all}, \epsilon_k^\mathrm{all}) = 0 \\
+\end{aligned}
+$$
+
+## Where ranef() estimates come from {.smaller}
+
+The estimates for the partial pooling intercept will lie between the complete pooling and no pooling estimates. They come from a weighted average of the complete and no pooling estimates.
+
+The weighting is based on the number of observations in a group and the variance estimates.
+
+In the simple intercept-only model (without `x`), the weighted average is
+
+$$
+\hat{\alpha_j} \approx
+\frac{\frac{n_j}{\sigma^2_y} \bar{y}_j +
+  \frac{1}{\sigma^2_\alpha} \bar{y}}{\frac{n_j}{\sigma^2_y} + \frac{1}{\sigma^2_\alpha}}
+$$
+
+where $j$ indicates group, $\alpha_j$ is the estimated mean of the jth county, $\sigma^2_\alpha$ is the between-county variance, and $\sigma^2_y$ is the *within-county* (residual) variance.
+
+$\bar{y}$ is the overall mean (complete pooling estimate), and $\bar{y}_j$ is the group-level mean (no-pooling estimate).
+
+## Random slopes {.smaller}
+
+```{r, message=FALSE}
+rs <- lmer(y ~ x + (1 + x | county), data = radon)
+display(rs)
+```
+
+Notice that we get a correlation estimate between the random effects
+
+- With `x` $\geq 0$, we expect slope and intercept to be negatively correlated
+
+- And slopes will similarly be shrunk (compared to a no-pooling slope model)
+
+# More nesting!
+
+## Hierarchical data
+
+```{r}
+pairs(Pastes)
+```
+
+---
+
+
+```{r}
+summary(Pastes)
+```
+
+It's best not to assume data is properly nested---check it out, perhaps removing misclassified rows.
+
+---
+
+```{r}
+ggplot(Pastes, aes(x = reorder(batch, X = strength), y = strength)) +
+    geom_boxplot()
+```
+
+---
+
+```{r}
+pm =  lmer(strength ~ 1 + (1|batch) + (1|sample), Pastes)
+# alternately lmer(strength ~ 1 + (1|batch) + (1|batch:cask), Pastes)
+display(pm)
+```
+
+---
+
+```{r, fig.width=7, fig.height=5}
+pm.prof = profile(pm)
+xyplot(pm.prof)
+```
+
+Which one looks bad?
+
+---
+
+```{r}
+(pm.ci = confint(pm.prof, method = "boot"))
+```
+
+This is telling use that the cask variability, `.sig01`, (within batch) is significant, but the batch-to-batch variability, `.sig02`, isn't significant.
+
+So we'd want to re-run the model with just the `sample` random effect.
+
+# Questions?
+
+# That's all for tonight!
