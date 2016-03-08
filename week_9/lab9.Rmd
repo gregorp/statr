@@ -1,0 +1,203 @@
+---
+title: "Lab 9:"
+subtitle: "Ecological Fallacy and Mixed Model Predictions"
+author: "Gregor Thomas"
+date: "Monday, March 02, 2015"
+output: ioslides_presentation
+---
+
+# Ecological Fallacy
+
+## What is the ecological fallacy?
+
+```{r, echo=FALSE, include=FALSE}
+packages = c("ggplot2", "arm", "gridExtra", "boot", "lattice",
+             "dplyr", "lme4", "magrittr", "car")
+lapply(packages, library, character.only = T)
+```
+
+The *ecological fallacy* is attempting to draw individual-level conclusions from aggregated group-level data. Often, the conclusions are incorrect.
+
+If you want to draw a conclusion at a certain level, you need data collected *at that level*.
+
+## UC Berkeley Grad Admissions (1973)
+
+The `UCBAdmissions` data are built in to R. They're from a classic [paper in *Science*](http://brenocon.com/science_1975_sex_bias_graduate_admissions_data_berkeley.pdf). (They also have a very annoying structure - 3d array :( )
+
+We have aggregate data for graduate admissions by gender and department for the 6 biggest departments. (The complete data would include 101 departments.)
+
+## Aggregate data
+
+```{r, echo = FALSE, fig.height = 4}
+apply(UCBAdmissions, c(1, 2), sum)
+mosaicplot(apply(UCBAdmissions, c(1, 2), sum),
+           main = "Student admissions at UC Berkeley")
+```
+
+## Now look by department
+
+```{r, echo = F, fig.height = 5}
+## Data for individual departments
+opar <- par(mfrow = c(2, 3), oma = c(0, 0, 2, 0))
+for(i in 1:6)
+  mosaicplot(UCBAdmissions[,,i],
+    xlab = "Admit", ylab = "Sex",
+    main = paste("Department", LETTERS[i]))
+mtext(expression(bold("Student admissions at UC Berkeley")),
+      outer = TRUE, cex = 1.5)
+par(opar)
+```
+
+## Simpson's Paradox
+
+The Berkeley data illustrates *Simpson's Paradox*, which is a special case of the Ecological Fallacy with two groups (men and women in this example). It's possible for group A to be more probable than group B in **every single individual case**, but still see the opposite if everything is pooled together.
+
+[It has a nice Wikipedia page](https://en.wikipedia.org/wiki/Simpson%27s_paradox) with quite a few examples and a nicely simple graph illustration.
+
+## Presidential Voting Patterns
+
+In the 2004 presidential election, poor states (measured in median income) tended to vote for Bush, and rich states tended to vote for Kerry. So: can we conclude that poor people voted for Bush and rich people for Kerry?
+
+- No! The opposite is true looking at individual-level data.
+
+## Don't Create Fallacies
+
+Sometimes the ecological fallacy is created by researchers regressing on aggregate measures *even in the presence of individual data*. Oft-cited reasons for aggregating before analysis are
+- simplifying
+- not wanting to fit individual lines
+- avoiding individuals with low numbers of observations
+
+While it doesn't help much with "simplifying", using multilevel models / random effects can solve the other two concerns (as in the Radon example).
+
+## Generalizing Surveys to Populations
+
+In social sciences, often you have surveys that over- and under- represent certain groups in the population. Some surveys come with "survey weights" which are supposed to be used to adjust estimates to map to the whole population. 
+
+## Using survey weights is annoying {.smaller}
+
+> Survey weighting is a mess. It is not always clear
+how to use weights in estimating anything more complicated
+than a simple mean or ratios, and standard errors
+are tricky even with simple weighted means.
+
+(Gelman in [*Struggles with Survey Weighting and Regression Modeling*](http://www.stat.columbia.edu/~gelman/research/published/STS226.pdf)).
+
+A more modern approach is called Multilevel Regression and Poststratification (MRP, "Mister P"), which relies heavily on multilevel modeling, is (perhaps) easier to understand for those with a decent grasp of random effects, and is *much* more flexible in the estimates you can get out. [One good sources is here](https://aje.oxfordjournals.org/content/179/8/1025.full).
+
+## Flexibility of Mixed Models
+
+One other point I want to make is that random effects can be combined with all of the other techniques we've learned. `lme4` supports GLMs well, and `mgcv` will let you include random effects with a GAM. (Though `mgcv` relies on `nlme` instead of `lme4`, so the syntax for specifying random effects is a little different.)
+
+# Mixed Model Predictions
+
+## Predictions for new data based on Mixed Models
+
+Point estimates are easy, the `predict` has methods for `merMods` which work just fine.
+
+Confidence intervals are hard.
+
+## {.smaller}
+
+From the (very thorough and nice) FAQ for [R-SIG-Mixed-Models](http://glmm.wikidot.com/faq), the general recipe for computing predictions from a linear or generalized linear model is to:
+
+- figure out the model matrix X corresponding to the new data;
+    - You'll always have to make new data. `model.matrix` will help expand factors into dummy variables
+- matrix-multiply X by the parameter vector $\beta$ to get the predictions (or linear predictor in the case of GLM(M)s);
+    - We can just use `predict()` for this.
+- extract the variance-covariance matrix of the parameters V;
+- compute XVX' to get the variance-covariance matrix of the predictions;
+- extract the diagonal of this matrix to get variances of predictions;
+- if computing prediction rather than confidence intervals, add the residual variance;
+- take the square-root of the variances to get the standard deviations (errors) of the predictions;
+- compute confidence intervals based on a Normal approximation;
+- for **G**LMMs, run the confidence interval boundaries (not the standard errors) through the inverse-link function.
+
+## Do we have to do *all* of that?
+
+Usually no. Gelman & Hill cut some corners in Chapter 12. (Later in the book, esp. Chapter 18, they are quite thorough.) We'll stick with the cut-corner version.
+
+```{r}
+# Get data and model
+load("radon.RData")
+fixed = lm(y ~ x + county, data = radon)
+re = lmer(y ~ x + (1 | county), data = radon)
+```
+
+## New observation at existing level
+
+Point estimates are easy. Let's predict, for county `1`, radon measurements for the basement and first floor (x = 0 and 1).
+
+```{r}
+# new data
+county1 = data.frame(x = 0:1,
+    county = factor(c(1, 1),
+        levels = levels(radon$county)))
+# point estimates
+```
+
+## Fixef model
+
+```{r}
+(fix.1 = predict(fixed, newdata = county1, se.fit = T))
+```
+
+## Ranef model
+
+```{r}
+(re.1 = predict(re, newdata = county1))
+```
+
+We could stop here if we don't need confidence intervals.
+
+## Simuluating CI
+
+Simulation is the best way to get a good CI for a mixed effects model prediction. For a predictive estimate $\tilde y$ based on new data $\tilde x$ in group $j$:
+
+$$
+\tilde{y} | \theta \sim \mathcal{N}(\alpha_j + \beta \tilde{x}, \sigma^2_y)
+$$
+
+With this example, it still is pretty easy,
+but it generalizes to cases with more error terms.
+
+---
+
+```{r}
+j = 1       # county 1
+x.tilde = 1 # for 1st floor
+# arm::sigma.hat, quite useful for residual error extraction
+sigma.y.hat = sigma.hat(re)$sigma$data 
+coef.hat    = as.matrix(coef(re)$county)[j, ]
+y.tilde     = rnorm(1000, coef.hat %*% cbind(1, x.tilde), sigma.y.hat)
+```
+
+----
+
+```{r}
+quantile(y.tilde, c(.025, .25, .5, .75, .975))
+```
+
+## Out-of-sample prediction
+
+Point estimate: 
+
+```{r}
+predict(re, newdata = data.frame(x = 0:1, county = c(86, 86)),
+        allow.new.levels = TRUE)
+```
+
+
+## Out-of-sample CI
+
+For a new county, we don't have an estimated intercept, so we
+sample that as well:
+
+```{r}
+n.sims = 1000
+a.hat = fixef(re)["(Intercept)"]
+sigma.a.hat = sigma.hat(re)$sigma$county
+a.tilde = rnorm(n.sims, a.hat, sigma.a.hat)
+y.tilde = rnorm(n.sims, a.tilde + coef.hat["x"] %*% x.tilde, sigma.y.hat)
+mean(y.tilde)
+quantile(y.tilde, c(0.25, .5, .75))
+```
