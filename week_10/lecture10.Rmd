@@ -1,0 +1,250 @@
+---
+title: 'Lecture 10:'
+subtitle: 'Looking Backward, Looking Forward'
+author: "Gregor Thomas"
+date: "Thursday, March 10, 2016"
+output:
+  ioslides_presentation:
+    fig_height: 3.5
+    fig_width: 5
+    highlights: pygments
+    incremental: yes
+    theme: cosmo
+fontsize: 8pt
+---
+
+## Announcements
+
+- Final projects due Wednesday, March 16. Early submissions welcome.
+- Course evaluations: 
+    - Please do them, we take your feedback very seriously.
+    - Direct feedback welcome: gregorp@uw.edu
+- Keep in touch! I'm on LinkedIn, or you can email me. My UW account may not work for much longer, my personal email is gregor.p.thomas@gmail.com
+
+```{r, echo = FALSE, include=FALSE}
+packages = c("ggplot2", "arm", "gridExtra", "fortunes", 
+             "dplyr")
+lapply(packages, library, character.only = T)
+theme_set(theme_bw(12))
+```
+
+## Tonight's Menu
+
+- Looking backward
+    - statistics
+    - programming
+- Looking forward (and all around)
+    - Survival (time-to-event) analysis
+    - Causal modeling
+    - Predictive modeling
+    - Full-on Bayes
+- Wrap-up
+
+## Modeling
+
+*All models are wrong, but some are useful.* (George Box)
+
+- Modeling is not an end in itself---be clear about your goals.
+
+---
+
+Different goals: **inferential** - predictive - causal
+
+---
+
+Use your domain-specific knowledge (or your colleagues'). Statistical models and tests are algorithms based on many assumptions.
+
+## Linear regression {.smaller}
+
+Four ways to think about ordinary linear regression:
+
+- Curve-fitting (or rather line-fitting)
+    - **Least squares** error optimization problem
+    - Get the line as close to the points as possible, using $\epsilon^2$ as the loss function
+- **Maximum Likelihood Estimate** (MLE) assuming $y = X \beta + \epsilon$, where the errors are normally distributed.
+- **Expected values** - all about the means & the expected change in one variable as others change.
+    - $E(y) = E(X \beta)$ (because $E(\epsilon) = 0$ and $\epsilon$ is uncorrelated with $y$, $X$)
+- **Variance** - partition the observed variance of $y$ into explainable and unexplainable pieces.
+    - This is *exactly* what $R^2$ measures. So why don't we like $R^2$?
+        - Oh yeah, no penalization for more coefficients.
+
+## Explore your data
+
+- Don't *make* data assumptions, *check* them
+- Make **lots** of plots
+- Be careful of types! (Use factors when appropriate---only when appropriate)
+- Transform as necessary or as convenient, centering and dividing by one or two standard deviations, taking logs, ...
+    - Think of standardizing data as unit conversions. Standardizing variables puts them in the common unit of "standard deviations".
+
+## Data and model checking
+
+- collinearity
+- outliers and leverage
+- residuals
+- posterior checks (simulate data from your model, see if it looks like your actual data)
+
+## Diagnostic plots
+
+```{r}
+mod = lm(mpg ~ disp, data = mtcars)
+mod.log = lm(log(mpg) ~ log(disp), data = mtcars)
+```
+
+```{r, echo = FALSE, fig.width=6}
+par(mfrow = c(1, 2), mar = c(0.5, 0.5, 3, 0.5), cex = 0.5)
+plot(mod, which = 1, caption = NA, main = "Residuals vs Fitted, mod",
+     yaxt = 'n', xaxt = 'n')
+plot(mod.log, which = 1, caption = NA, main = "Residuals vs Fitted, mod.log",
+     yaxt = 'n', xaxt = 'n')
+```
+
+
+## QQ Plots
+
+```{r}
+fortune(105)
+```
+
+Gelman on QQ plots: *Forget them! Remember something useful instead!*
+
+## QQ Plots
+
+```{r, echo = FALSE, fig.width = 6}
+par(mfrow = c(1, 2), mar = c(0.5, 0.5, 3, 0.5), cex = 0.5)
+plot(mod, which = 2, caption = NA, main = "QQ Plot, mod",
+     yaxt = 'n', xaxt = 'n')
+plot(mod.log, which = 2, caption = NA, main = "QQ Plot, mod.log",
+     yaxt = 'n', xaxt = 'n')
+```
+
+## Model selection and comparison
+
+- R^2, AIC/BIC, ANOVA, LRT
+    - Penalizing variables is good---prefer BIC especially with large data
+    - LRT can bu used **only** if models are nested
+    - To compare two models where you've transformed the response, you should back-transform to compare errors on the same scale
+- p-values and standard errors
+- stepwise regression and multiple comparisons
+
+## Extending linear models {.smaller}
+
+These methods let us bend or break certain assumptions of linear regression.
+
+- GLM: non-normal error distributions, link functions
+- Robust regression: resisting the pull of outliers
+- Random effects: distributional relationships between parameters
+- GAMs: additive (but no longer linear) functions of predictors
+- Next quarter
+    - Lasso and Ridge Regression (shrinkage and dimension reduction)
+    - Time series (auto-correlation, decomposition)
+- Other
+    - Hazard regression (survival/time-to-event analysis)
+    - Generalized Estimating Equations (GEE, like random effects but focused on the population rather than the groups)
+
+# Programming
+
+## Style {.smaller}
+
+- Find a style you like and *be consistent*
+- Document functions in Roxygen format whether or not they're destined for a package
+- Use functions! And lists! And for loops! And `*apply` statements!
+    - If you're **copy/pasting** code frequently, you're doing something wrong. Write a function or a for loop instead. 
+    - If you're naming variables sequentially, they should instead be inside a vector or a list.
+- Optimizing code: don't worry about it *unless it's actually a problem*.
+    - 90% of the time, the fastest way to code something is the first way that occurs to you to do it (counting both human and computer time, and putting more weight on human time).
+
+## The Hadley-verse
+
+I've given you a nice introduction to the "Hadley-verse", using `ggplot2`, `dplyr`, `stringr`, `devtools`, `roxygen2`, etc.
+
+I like it for its consistency. That said, everything done with these packages can be done in other ways, and there's no reason to be dogmatic about their use.
+
+There are disadvantages, the biggest of which is that many of them are still changing! `ggplot2` is pretty stable but still being updated! `dplyr` [still has known bugs](https://github.com/hadley/dplyr/issues) and is undergoing changes.
+
+## At least the bugs are known
+
+```{r}
+fortunes::fortune(315)
+```
+
+## Getting better at R programming
+
+There are two things you need to do to continue to rapidly improve your R code
+
+1. Write code
+2. Read code
+
+Writing is the easy part, you'll probably have to do it. Reading is the hard part, because you have to actively seek out examples. It's crucial for continued learning.
+
+Most of my R programming expertise has come from participating on Stack Overflow. Reading R-Bloggers is good, reading the r-help mailing list is good (though old-school), and you can also find examples on Github.
+
+## R programming suggested reading
+
+- [The R Inferno](http://www.burns-stat.com/pages/Tutor/R_inferno.pdf): fun, relatively short, and very useful. A tour of the circles of R hell (and how to escape them). **Very practical**.
+
+- [Hadley's Advanced R Book](http://adv-r.had.co.nz/): read this if you want to dig in to the language and understand how things work and why they are the way they are.
+
+
+# Looking Forward
+
+## Time-to-event models
+
+Typical use case: binary outcome (alive/dead, working/broken, success/failure) with a time associated with it *where you are interested in both the outcome and the time* (or even just the time). Very common with *censored data*.
+
+Usually the assumption is that the outcome *is inevitable*, e.g., death. Imagine data tracking subjects with advanced cancer... at the time of analysis some will have died, and other will be alive. The ones who haven't (yet) experienced an "event" (death) are called *censored*.
+
+With different follow-up times, logistic regression is inappropriate (or difficult to do correctly).
+
+## Common use-cases
+
+- Medical studies
+- Failure time of manufactured parts
+- Customer/Employee retention
+- Time spent in foster care
+- Any time-to-event
+
+Extensions: multiple possible events (competing risks), events that can accumulate (counting process), sequential events (multistate models).
+
+Key thing to know: Cox model, proportional hazards
+
+Recommended introduction: [John Fox's Appendix on Survival Analysis](https://socserv.socsci.mcmaster.ca/jfox/Books/Companion-1E/appendix-cox-regression.pdf)
+
+## Causal modeling {.smaller}
+
+We have focused on *inference*, but nothing we have done has shown causality.
+
+To make *causal* claims, you need a good theoretical model with a plausible causal chain with some time-dependence. You also need excellent data, usually an experiment or pseudo-experiment.
+
+Some good techniques:
+
+- propensity score matching (finding comparable pairs in treatment and control groups)
+- instrumental variables (good for creating "natural experiments" - but only truly effective on the margins)
+
+Recommended reading:
+- To start: G&H Chapters 9 and 10, also Chapter 23
+- Diving in: Judea Pearl's *Causality*.
+
+## Prediction
+
+Plenty of this to come next quarter :)
+
+**How is it different?**
+
+- Different goals
+- Interpretability is de-emphasized
+- Hypothesis testing non-existent
+
+
+## Going Bayesian
+
+$$P(model|data) \propto P(data|model)P(model)$$
+
+Main idea: All about probability distributions. Specify a *prior distribution* with any information you already know/suspect about model parameters, and use that ($P(model)$) as a starting place. The result is a *posterior distribution* of your model.
+
+Stan is the newest, shiniest tool. 
+
+Recommended books: The rest of G&H, [Doing Bayesian Data Analysis](http://www.indiana.edu/~kruschke/DoingBayesianDataAnalysis/) by John Kruschke.
+
+- **Taking Stan for a spin**
+
+# Thanks!
