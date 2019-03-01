@@ -16,3 +16,21 @@ Once RStudio knows where your Git installation is, open File > New Project > Ver
 In RStudio, when this project is open, you should have a `Git` tab, just like your `Plots`, `Help`, `Packages`, etc. tabs. To update your files, simply go to the `Git` tab and click **Pull**.
 
 Do not edit the files that are pulled (but you can copy and rename them and edit the copies). Whenever you *Pull*, Git will download any new files I have added to the repository and update existing files with any changes I have made.
+
+---
+
+## Table of Contents
+
+|         | Lecture Topics                          | Lab Topics                                           |
+|---------|-----------------------------------------|------------------------------------------------------|
+| Week 1  | Likelihood, linear regression           | Charts with ggplot2                                  |
+| Week 2  | Transformations and diagnostics         | Data manipulation with tidyr and dplyr               |
+| Week 3  | Logistic regression                     | Visualizing logistic regression (and a little regex) |
+| Week 4  | Other GLMs, outliers                    | Robust regression                                    |
+| Week 5  | Simulation, Box-Cox, packages           | Packages and documentation                           |
+| Week 6  | Smoothers: loess, splines, GAM          | Building packages                                    |
+| Week 7  | Best practices in workflow and vis      | Using packages in your package                       |
+| Week 8  | Multilevel models                       | Bootstrapping confidence intervals                   |
+| Week 9  | Collinearity, more mixed modeling       | Ecological fallacy, mixed model predictions          |
+| Week 10 | Review; mentions of other useful models | -                                                    |
+
