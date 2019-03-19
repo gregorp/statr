@@ -23,6 +23,7 @@ Do not edit the files that are pulled (but you can copy and rename them and edit
 
 |         | Lecture Topics                          | Lab Topics                                           |
 |---------|-----------------------------------------|------------------------------------------------------|
+| Week 0  | -                                       | Reproducible Reporting with knitr                    |
 | Week 1  | Likelihood, linear regression           | Charts with ggplot2                                  |
 | Week 2  | Transformations and diagnostics         | Data manipulation with tidyr and dplyr               |
 | Week 3  | Logistic regression                     | Visualizing logistic regression (and a little regex) |
